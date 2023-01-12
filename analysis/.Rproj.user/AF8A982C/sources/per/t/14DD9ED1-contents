@@ -217,6 +217,8 @@ When I removed sea ice cover, the warning was gone.
 ## logistic regression 
 ## glm with binomial response and logit link ===========================
 
+model_data
+
 # Model using unscaled data -------------------------------------------
 
 # model with 'device' variable
