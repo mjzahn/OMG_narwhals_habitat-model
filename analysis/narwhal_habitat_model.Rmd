@@ -15,6 +15,8 @@ library(corrplot)
 library(MuMIn)
 library(arm)
 library(faraway)
+library(ggplot2)
+library(sjPlot)
 ```
 
 
@@ -194,7 +196,7 @@ model_data_pooled <- model_vars_pooled_df %>%
   drop_na()
 ```
 
-```{r option to scale vars}
+```{r OPTION - scale vars}
 # scale data and ensure vars are numeric and drop na (=select complete observations)
 model_data_scale <- model_vars_df %>%
   mutate_at(vars(runoff,salt_surf,temp_surf,salt_deep,temp_deep,ice_cover_percent,
@@ -202,6 +204,34 @@ model_data_scale <- model_vars_df %>%
   drop_na() %>% 
   mutate_at(vars(runoff,salt_surf,temp_surf,salt_deep,temp_deep,ice_cover_percent,
                  velocity,glacier_length,DOY),scale)
+```
+
+```{r select data before freeze-up}
+## since we know narwhals cannot survive in Melville Bay after the freeze up, we will select data from before the fast ice comes in
+## here, I define the freeze up date as the day when sea ice > 90%
+
+## freeze up date in 2018
+head(model_data_pooled %>% dplyr::filter(ice_cover_percent>75,year==2018))
+# 2018-10-28 which is equal to DOY=301 # sverdrup froze up first
+
+## freeze up date in 2019
+model_data_pooled %>% dplyr::filter(ice_cover_percent>75,year==2019, DOY>100)
+# 2019-12-23 which is equal to DOY=357 # rink froze up first
+
+## filter all data before these dates
+mdl_data_open_water2018 <- model_data_pooled %>% filter(year==2018) %>% 
+  filter(DOY<301)
+mdl_data_open_water2019 <- model_data_pooled %>% filter(year==2019) %>% 
+  filter(DOY>100,DOY<357)
+
+# sanity check plots
+qplot(as.Date(time),ice_cover_percent, geom="point", data = mdl_data_open_water2018)
+qplot(as.Date(time),ice_cover_percent, geom="point", data = mdl_data_open_water2019)
+
+## join both datasets
+mdl_data_b4freeze_pooled <- rbind(model_data_open_water2018, model_data_open_water2019)
+
+qplot(as.Date(time),ice_cover_percent, geom="point", data = mdl_data_b4freeze_pooled)
 ```
 
 
@@ -217,8 +247,6 @@ When I removed sea ice cover, the warning was gone.
 ## logistic regression 
 ## glm with binomial response and logit link ===========================
 
-model_data
-
 # Model using unscaled data -------------------------------------------
 
 # model with 'device' variable
@@ -233,7 +261,9 @@ mdl_global <- glm(narwhal ~
                     glacier_length+
                     device+
                     DOY,
-                  data = model_data,family=binomial(link="logit"),na.action="na.fail")
+                  data = mdl_data_b4freeze,
+                  family=binomial(link="logit"),
+                  na.action="na.fail")
 
 # model without device (pooled detections)
 mdl_global_pooled <- glm(narwhal ~
@@ -246,7 +276,7 @@ mdl_global_pooled <- glm(narwhal ~
                            ice_cover_percent+
                            glacier_length+
                            DOY,
-                         data = model_data_pooled,
+                         data = mdl_data_b4freeze_pooled,
                          family=binomial(link="logit"),na.action="na.fail")
 
 # print summary output
@@ -257,6 +287,8 @@ faraway::sumary(mdl_global_pooled)
 par(mfrow = c(2,2))
 plot(mdl_global)
 plot(mdl_global_pooled)
+plot_model(mdl_global_pooled,type="pred")
+
 ```
 
 ```{r diagnostics}
@@ -272,7 +304,7 @@ binnedplot(fitted(mdl_global_pooled),
 
 ## compute R^2
 # deviances
-nn <- length(model_data_pooled$time)
+nn <- length(mdl_data_b4freeze_pooled$time)
 DM_mod <- mdl_global_pooled$deviance
 D0_mod <- mdl_global_pooled$null.deviance
 # R^2
@@ -303,40 +335,11 @@ CD <- cooks.distance(mdl_global_pooled)
 faraway::halfnorm(CD, las = 1, ylab = "")
 mtext(side = 2, text = "Sorted Data", line = 3.5)
 
-## Plot Leverages and Cook's D--------------------------------------
-## plot age vs length
-plot(narwhal ~ runoff, data = model_data,
-pch = 16, cex = 1.3,
-yaxt = "n", ylab = "Narwhal Detection", xlab = "runoff")
-axis(2, at = c(0,1), labels = c("0", "1"), las = 1)
-
-## add model fit
-## get fitted values
-newdata <- data.frame(runoff = seq(20, 160))
-eta <- predict(mdl_global, newdata)
-# transform out of logit space
-p_hat <- 1 / (1 + exp(-eta))
-## get the SE of the response
-se <- predict(mod_fit, newdata, type = "link", se.fit = TRUE)$se.fit
-## upper 95% CI
-CI_upper <- 1 / (1 + exp(-(eta + 1.96*se)))
-## lower 95% CI
-CI_lower <- 1 / (1 + exp(-(eta - 1.96*se)))
-## 95% CI for beta_i based on profile likelihood
-round(confint(mod_fit), 2)
-
-runoff_sim <- seq(0, 400)
-lines(p.freq, p_hat, lwd = 2)
-## add 95% CI's
-lines(p.freq, CI_upper, lwd = 1, col = "gray")
-lines(p.freq, CI_lower, lwd = 1, col = "gray")
-## add CD points
-points(whale.data[1348,"p.freq"], whale.data[1348, "species"], pch = 1, cex = 2)
-text(whale.data[1348,"p.freq"], whale.data[1348, "species"], "1321 & 1348", pos = 3, offset = 0.8)
-
 ## H-L test with 8 groups
+# A non-significant p value indicates that there is no evidence that the observed and expected frequencies differ (i.e., evidence of good fit).
 library(generalhoslem)
-generalhoslem::logitgof(obs = model_data$narwhal, exp = fitted(mdl_global), g = 8)
+generalhoslem::logitgof(obs = mdl_data_b4freeze_pooled$narwhal,
+                        exp = fitted(mdl_global_pooled), g = 8)
 ```
 
 
@@ -375,6 +378,8 @@ dredge_mdl <- dredge(mdl_global_pooled)
 dredge_mdl
 ```
 
+
+
 ```{r}
 library(sjPlot)
 ```
@@ -382,12 +387,11 @@ library(sjPlot)
 
 ```{r fit best model}
 # model with 'device' variable
-mdl_best <- glm(narwhal ~ runoff+temp_deep+ice_cover_percent+device+DOY,
-                  data = model_data,family=binomial(link="logit"),na.action="na.fail")
+mdl_best <- glm(narwhal ~ glacier+glacier_length+runoff+salt_deep+ice_cover_percent,
+                  data = mdl_data_b4freeze_pooled,family=binomial(link="logit"),na.action="na.fail")
 
 summary(mdl_best)
 plot_model(mdl_best, type='pred',ci.lvl = NA)
-plot_model(mdl_global, type='pred', se = F)
 
 ## plot deviance residuals------------------------------------------
 ## set plot area
@@ -401,7 +405,7 @@ main = "")
 
 ## compute R^2
 # deviances
-nn <- length(model_data$time)
+nn <- length(mdl_data_b4freeze_pooled$time)
 DM_mod <- mdl_best$deviance
 D0_mod <- mdl_best$null.deviance
 # R^2
@@ -446,7 +450,7 @@ plot(mdl_sver)
 
 
 ```{r check autocorrelation}
-acf(resid(mdl_global))
+acf(resid(mdl_global_pooled))
 ```
 
 
