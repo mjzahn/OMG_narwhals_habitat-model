@@ -87,10 +87,22 @@ sver_glacier_length <- read.csv(paste(path,"glacier_length/sverdrup_glacier_leng
 glacier_len<-rbind(kong_glacier_length,rink_glacier_length,sver_glacier_length)
 
 # runoff
-runoff_kong <- read.csv(paste(path,"runoff/kongoscar_runoff_1D.csv",sep=''))%>% mutate(site="kong")
-runoff_rink <- read.csv(paste(path,"runoff/rink_runoff_1D.csv",sep=''))%>% mutate(site="rink")
-runoff_sver <- read.csv(paste(path,"runoff/sverdrup_runoff_1D.csv",sep=''))%>% mutate(site="sver")
-runoff<-rbind(runoff_kong,runoff_rink,runoff_sver)
+# MAR
+runoff_mar_kong <- read.csv(paste(path,"runoff/kongoscar_runoff_mar_1D.csv",sep=''))%>% mutate(site="kong")
+runoff_mar_rink <- read.csv(paste(path,"runoff/rink_runoff_mar_1D.csv",sep=''))%>% mutate(site="rink")
+runoff_mar_sver <- read.csv(paste(path,"runoff/sverdrup_runoff_mar_1D.csv",sep=''))%>% mutate(site="sver")
+runoff_mar <- rbind(runoff_mar_kong,runoff_mar_rink,runoff_mar_sver) %>% 
+  rename(runoff_mar=runoff)
+
+# RACMO
+runoff_racmo_kong <- read.csv(paste(path,"runoff/kongoscar_runoff_racmo_1D.csv",sep=''))%>% 
+  mutate(site="kong")
+runoff_racmo_rink <- read.csv(paste(path,"runoff/rink_runoff_racmo_1D.csv",sep=''))%>% 
+  mutate(site="rink")
+runoff_racmo_sver <- read.csv(paste(path,"runoff/sverdrup_runoff_racmo_1D.csv",sep=''))%>% 
+  mutate(site="sver")
+runoff_racmo <- rbind(runoff_racmo_kong,runoff_racmo_rink,runoff_racmo_sver) %>% 
+  rename(runoff_racmo=runoff)
 
 # sea ice
 sea_ice_rink <- read.csv(paste(path,"sea_ice/fisher_seaice_cover_1D.csv",sep=''))%>% mutate(site="rink")
@@ -131,7 +143,9 @@ glacier_vars_df <- read.csv(paste(path,"narwhal_model_glacier_vars.csv",sep=''))
 ## make data tidy and join all vars into one df
 
 # ALL narwhal detections (aural + soundtrap)
-model_vars_df <- runoff %>% left_join(salt_surf, by = c('time', 'site')) %>% 
+model_vars_df <- runoff_racmo %>% 
+  left_join(runoff_mar, by = c('time', 'site')) %>%
+  left_join(salt_surf, by = c('time', 'site')) %>% 
   left_join(salt_deep, by = c('time', 'site')) %>%
   left_join(temp_surf, by = c('time', 'site')) %>%
   left_join(temp_deep, by = c('time', 'site')) %>%
@@ -144,7 +158,9 @@ model_vars_df <- runoff %>% left_join(salt_surf, by = c('time', 'site')) %>%
 
 # pooled narwhal detections (i.e., any positive detection from Aural or ST = 1)
 narwhal_pooled_dets <- narwhal_pooled %>% dplyr::select(narwhal, site, time)
-model_vars_pooled_df <- runoff %>% left_join(salt_surf, by = c('time', 'site')) %>% 
+model_vars_pooled_df <- runoff_racmo %>% 
+  left_join(runoff_mar, by = c('time', 'site')) %>%
+  left_join(salt_surf, by = c('time', 'site')) %>% 
   left_join(salt_deep, by = c('time', 'site')) %>%
   left_join(temp_surf, by = c('time', 'site')) %>%
   left_join(temp_deep, by = c('time', 'site')) %>%
@@ -186,12 +202,12 @@ Consider dropping the deeper CTD terms
 ```{r select complete obs}
 # ensure vars are numeric and drop na (=select complete observations)
 model_data <- model_vars_df %>%
-  mutate_at(vars(runoff,salt_surf,temp_surf,salt_deep,temp_deep,ice_cover_percent,
+  mutate_at(vars(runoff_racmo,salt_surf,temp_surf,salt_deep,temp_deep,ice_cover_percent,
                  velocity,glacier_length,DOY),as.numeric) %>% 
   drop_na()
 
 model_data_pooled <- model_vars_pooled_df %>%
-  mutate_at(vars(runoff,salt_surf,temp_surf,salt_deep,temp_deep,ice_cover_percent,
+  mutate_at(vars(runoff_racmo,salt_surf,temp_surf,salt_deep,temp_deep,ice_cover_percent,
                  velocity,glacier_length,DOY),as.numeric) %>% 
   drop_na()
 ```
@@ -219,9 +235,16 @@ model_data_pooled %>% dplyr::filter(ice_cover_percent>75,year==2019,DOY>100)
 # 2019-12-23 which is equal to DOY=357 # rink froze up first
 
 ## filter all data before these dates
-mdl_data_open_water2018 <- model_data_pooled %>% filter(year==2018) %>% 
+# not pooled
+mdl_data_open_water2018 <- model_data %>% filter(year==2018) %>% 
   filter(DOY<301)
-mdl_data_open_water2019 <- model_data_pooled %>% filter(year==2019) %>% 
+mdl_data_open_water2019 <- model_data %>% filter(year==2019) %>% 
+  filter(DOY>100,DOY<357)
+
+# pooled
+mdl_data_open_water2018_pool <- model_data_pooled %>% filter(year==2018) %>% 
+  filter(DOY<301)
+mdl_data_open_water2019_pool <- model_data_pooled %>% filter(year==2019) %>% 
   filter(DOY>100,DOY<357)
 
 # sanity check plots
@@ -229,7 +252,8 @@ qplot(as.Date(time),ice_cover_percent, geom="point", data = mdl_data_open_water2
 qplot(as.Date(time),ice_cover_percent, geom="point", data = mdl_data_open_water2019)
 
 ## join both datasets
-mdl_data_b4freeze_pooled <- rbind(mdl_data_open_water2018, mdl_data_open_water2019)
+mdl_data_b4freeze <- rbind(mdl_data_open_water2018, mdl_data_open_water2019)
+mdl_data_b4freeze_pooled <- rbind(mdl_data_open_water2018_pool, mdl_data_open_water2019_pool)
 
 qplot(as.Date(time),ice_cover_percent, geom="point", data = mdl_data_b4freeze_pooled)
 ```
@@ -256,7 +280,7 @@ mdl_global <- glm(narwhal ~
                     salt_surf+
                     salt_deep+
                     ice_cover_percent+
-                    runoff+
+                    runoff_racmo+
                     glacier_length+
                     device+
                     site+
@@ -279,7 +303,7 @@ mdl_global_pooled <- glm(narwhal ~
                            salt_surf+
                            salt_deep+
                            ice_cover_percent+
-                           runoff+
+                           runoff_racmo+
                            glacier_length+
                            site+
                            DOY,
