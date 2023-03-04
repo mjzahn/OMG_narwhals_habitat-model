@@ -7,6 +7,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_knit$set(root.dir = 'C:/Users/marie/Documents/OMG_Narwhals/OMG_narwhals_habitat-model')
 ```
 
 ```{r load packages}
@@ -17,73 +18,145 @@ library(arm)
 library(faraway)
 library(ggplot2)
 library(sjPlot)
+library(here)
+```
+
+Open Data
+```{r open rdata files}
+# reload data from anywhere
+load(here('data-cleaning_R/narwhal_model_data.rdata')) # only observations for open-water period (SI < 75%)
+load(here('data-cleaning_R/narwhal_model_data_whales.rdata')) # only observations for when narwhals were in the area
+```
+
+## Compare detections in 2019
+
+```{r aural and soundtrap detections 2019}
+## pool soundtrap and aural detections for 2019 data (i.e., take only one obs/day for each site)
+mdl_data_open_water_pooled_2019 <- mdl_data_open_water %>% group_by(site,time) %>% 
+  filter(year==2019, narwhal==max(narwhal),(row_number()==n()))
+
+mdl_data_open_water_pooled <- mdl_data_open_water %>% group_by(site,time) %>% 
+  filter(narwhal==max(narwhal),(row_number()==n())) %>% dplyr::select(-device)
+
+## identify how many detections from the same day occurred at more than one site
+sum(mdl_data_open_water_pooled$narwhal) # total of 93 detections over two years at 3 sites
+narwhal_dets <- mdl_data_open_water_pooled %>% filter(narwhal==1) # number of days that narwhals were detected
+length(unique(narwhal_dets$time))
+
+mdl_data_open_water_pooled %>% dplyr::select(time, site, narwhal) %>% pivot_wider(names_from = site, values_from = narwhal) %>% mutate(rowsums = kong + rink + sver) %>% filter(rowsums>1)
+
+## tally up total detections for each site for a given year
+rink_2018 <- mdl_data_open_water_pooled %>% filter(year==2018, site=='rink')
+rink_2019 <- mdl_data_open_water_pooled %>% filter(year==2019, site=='rink')
+sum(rink_2018$narwhal)
+sum(rink_2019$narwhal)
+
+kong_2018 <- mdl_data_open_water_pooled %>% filter(year==2018, site=='kong')
+kong_2019 <- mdl_data_open_water_pooled %>% filter(year==2019, site=='kong')
+sum(kong_2018$narwhal)
+sum(kong_2019$narwhal)
+
+sver_2018 <- mdl_data_open_water_pooled %>% filter(year==2018, site=='sver')
+sum(sver_2018$narwhal)
+
+```
+
+Out of the 77 days that narwhals were detected, only 5 of those days were occasions when whales were detected at two locations on the same day. Whales were never detected at three locations on the same day.
+
+Totals between each year/site
+
+2018
+* Rink: 13
+* Kong Oscar: 8
+* Sverdrup: 7
+
+2019
+* Rink: 32
+* Kong Oscar: 33
+
+
+```{r aural vs soundtrap 2019}
+## see whether there are any aural detections that were NOT detected by the soundtrap in 2019
+aural_2019 <- mdl_data_open_water %>% group_by(site) %>% filter(year==2019,device=='aural') %>% dplyr::select(time,narwhal) %>% rename(narwhal_aural=narwhal)
+sound_2019 <- mdl_data_open_water %>% group_by(site) %>%  filter(year==2019,device=='soundtrap') %>% dplyr::select(time,narwhal)%>% rename(narwhal_sound=narwhal)
+
+compare <- aural_2019 %>% group_by(site) %>%  left_join(sound_2019,by="time") %>% filter(site.x==site.y, narwhal_aural==1 &narwhal_sound==0) &narwhal_sound==0
+compare
+
+sum(mdl_data_open_water_pooled$narwhal)
+mdl_data_open_water %>% filter(year==2018) %>% dplyr::select(narwhal) %>% sum()
+mdl_data_open_water %>% filter(year==2019,device=='soundtrap') %>% dplyr::select(narwhal) %>% sum()
+
+## double check using different method
+aural_2019_kong <- aural_2019 %>% filter(site=='kong') 
+sound_2019_kong <- sound_2019 %>% filter(site=='kong') 
+aural_2019_rink <- aural_2019 %>% filter(site=='rink') 
+sound_2019_rink <- sound_2019 %>% filter(site=='rink') 
+
+aural_2019_kong %>% left_join(sound_2019_kong,by="time") %>% filter(narwhal_aural==1&narwhal_sound==0)
+aural_2019_rink %>% left_join(sound_2019_rink,by="time") %>% filter(narwhal_aural==1&narwhal_sound==0)
+
 ```
 
 
-```{r select data before freeze-up}
-## since we know narwhals cannot survive in Melville Bay after the freeze up, we will select data from before the fast ice comes in
-## here, I define the freeze up date as the day when sea ice > 75%
+```{r normalize glacier length data}
+## normalize at the start of each year
+ref <- mdl_data_open_water_pooled %>% group_by(year, site) %>% filter(time==min(as.Date(time))) %>% dplyr::select(site,year,glacier_length) %>% dplyr::rename(length_ref=glacier_length)
 
-## freeze up date in 2018
-head(model_data_pooled %>% dplyr::filter(ice_cover_percent>75,year==2018))
-# 2018-10-28 which is equal to DOY=301 # sverdrup froze up first
+mdl_data_pooled <- mdl_data_open_water_pooled %>% left_join(ref,by=c("site","year")) %>% mutate(glacier_len_std = glacier_length - length_ref)
 
-## freeze up date in 2019
-model_data_pooled %>% dplyr::filter(ice_cover_percent>75,year==2019,DOY>100)
-# 2019-12-23 which is equal to DOY=357 # rink froze up first
+## sanity check plot
+mdl_data_pooled %>% ggplot(aes(x=as.Date(time),y=glacier_len_std,color=site))+
+  geom_point()
 
-## filter all data before these dates
-# not pooled
-mdl_data_open_water2018 <- model_data %>% filter(year==2018) %>% 
-  filter(DOY<301)
-mdl_data_open_water2019 <- model_data %>% filter(year==2019) %>% 
-  filter(DOY>100,DOY<357)
+```
 
-# pooled
-mdl_data_open_water2018_pool <- model_data_pooled %>% filter(year==2018) %>% 
-  filter(DOY<301)
-mdl_data_open_water2019_pool <- model_data_pooled %>% filter(year==2019) %>% 
-  filter(DOY>100,DOY<357)
+```{r whales only}
+# only select period when whales were in the area
+# filter all data before these dates
+mdl_data_whales2018 <- mdl_data_open_water_pooled %>% filter(year==2018) %>% 
+  filter(DOY<285) %>% drop_na()
+mdl_data_whales2019 <- mdl_data_open_water_pooled %>% filter(year==2019) %>% 
+  filter(DOY>100,DOY<292) %>% drop_na()
 
-# sanity check plots
-qplot(as.Date(time),ice_cover_percent, geom="point", data = mdl_data_open_water2018)
-qplot(as.Date(time),ice_cover_percent, geom="point", data = mdl_data_open_water2019)
+mdl_data_pooled_whales <- rbind(mdl_data_whales2018,mdl_data_whales2019)
+```
 
-## join both datasets
-mdl_data_b4freeze <- rbind(mdl_data_open_water2018, mdl_data_open_water2019)
-mdl_data_b4freeze_pooled <- rbind(mdl_data_open_water2018_pool, mdl_data_open_water2019_pool)
 
-qplot(as.Date(time),ice_cover_percent, geom="point", data = mdl_data_b4freeze_pooled)
+```{r check correlations}
+
+mdl_data_corr <- mdl_data_open_water_pooled %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year, noise_100Hz, noise_2kHz, runoff_mar)) %>% cor(use = "complete.obs")
+
+mdl_data_corr <- mdl_data_pooled %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year, noise_100Hz, noise_2kHz, runoff_mar)) %>% cor(use = "complete.obs")
+
+# salt_surf, salt_deep, and temp_deep all correlated with one another and with DOY
+# keep DOY and temp_surf
+mdl_data_corr <- mdl_data_open_water_pooled %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year, noise_100Hz, noise_2kHz, velocity, runoff_mar, salt_surf, salt_deep, temp_deep)) %>% cor(use = "complete.obs")
+
+mdl_data_corr <- mdl_data_pooled %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year, noise_100Hz, noise_2kHz, velocity, runoff_mar, salt_surf, salt_deep, temp_deep)) %>% cor(use = "complete.obs")
+
+# plot correlation test
+corrplot::corrplot(mdl_data_corr, method = 'number')
+
 ```
 
 
 ## Run models
 
-Got warning message when sea ice was included:
-Warning message:
-glm.fit: fitted probabilities numerically 0 or 1 occurred 
-
-When I removed sea ice cover, the warning was gone.
-
-```{r run glm | all sites}
+```{r global glm | pooled detections}
 ## logistic regression 
-## glm with binomial response and logit link ===========================
-
-# Model using unscaled data -------------------------------------------
-
-## model with 'device' variable (unpooled detections)
+## glm with binomial response and logit link 
 mdl_global <- glm(narwhal ~
                     temp_surf+
-                    temp_deep+
-                    salt_surf+
-                    salt_deep+
                     ice_cover_percent+
                     runoff_racmo+
                     glacier_length+
-                    device+
-                    site+
-                    DOY,
-                  data = mdl_data_b4freeze,
+                    noise_4kHz+
+                    year+
+                    DOY+
+                    site,
+                  # data = mdl_data_open_water_pooled,
+                  data = mdl_data_pooled,
                   family=binomial(link="logit"),
                   na.action="na.fail")
 
@@ -91,63 +164,130 @@ mdl_global <- glm(narwhal ~
 summary(mdl_global)
 faraway::sumary(mdl_global)
 
-par(mfrow = c(2,2))
-plot(mdl_global)
-plot_model(mdl_global,type="pred")
-
-## model without 'device' (pooled detections)
-mdl_global_pooled <- glm(narwhal ~
-                           temp_surf+
-                           temp_deep+
-                           salt_surf+
-                           salt_deep+
-                           ice_cover_percent+
-                           runoff_racmo+
-                           glacier_length+
-                           site+
-                           DOY,
-                         data = mdl_data_b4freeze_pooled,
-                         family=binomial(link="logit"),na.action="na.fail")
+## model using data for time period when whales were in the area
+mdl_global_whales <- glm(narwhal ~
+                    temp_surf+
+                    ice_cover_percent+
+                    runoff_racmo+
+                    glacier_length+
+                    noise_4kHz+
+                    as.factor(year)+
+                    DOY+
+                    site,
+                  data = mdl_data_pooled_whales,
+                  family=binomial(link="logit"),
+                  na.action="na.fail")
 
 # print summary output
-summary(mdl_global_pooled)
-faraway::sumary(mdl_global_pooled)
+summary(mdl_global_whales)
+faraway::sumary(mdl_global_whales)
+```
 
-par(mfrow = c(2,2))
-plot(mdl_global_pooled)
-plot_model(mdl_global_pooled,type="pred")
+
+
+```{r}
+library(sjPlot)
+plot_model(mdl_global_whales)
+plot_model(mdl_global_whales, type = 'pred')
+
+ 
+```
+
+
+Since we know the soundtrap detected more animals, I will run two separate models: one for all aural detections and one for soundtrap detections.
+
+```{r run glm | separate aural and soundtrap models}
+## model for only aural data (2018 and 2019)
+## select only aural data
+mdl_data_open_water_aural <- mdl_data_open_water %>% filter(device=='aural')
+
+mdl_global_aural <- glm(narwhal ~
+                    temp_surf+
+                    ice_cover_percent+
+                    runoff_racmo+
+                    glacier_length+
+                    noise_4kHz+
+                    year+
+                    DOY+
+                    site,
+                  data = mdl_data_open_water_aural,
+                  family=binomial(link="logit"),
+                  na.action="na.fail")
+
+# print summary output
+summary(mdl_global_aural)
+faraway::sumary(mdl_global_aural)
+
+## model for only soundtrap data (2019)
+## select only aural data
+mdl_data_open_water_soundtrap <- mdl_data_open_water %>% filter(device=='soundtrap')
+mdl_data_whales_soundtrap <- mdl_data_whales %>% filter(device=='soundtrap')
+
+mdl_global_soundtrap <- glm(narwhal ~
+                    temp_surf+
+                    ice_cover_percent+
+                    runoff_racmo+
+                    glacier_length+
+                    noise_4kHz+
+                    DOY+
+                    site,
+                  data = mdl_data_open_water_soundtrap,
+                  family=binomial(link="logit"),
+                  na.action="na.fail")
+
+# print summary output
+summary(mdl_global_soundtrap)
+faraway::sumary(mdl_global_soundtrap)
 
 ```
 
-Run separate glm for each glacier/site. Here I only use pooled datasets (=no device variable)
+
+Run separate glm for each glacier/site
 
 ```{r run glm | model for each site}
 ## Rink/Fisher ---------------------------------------------
-mdl_data_rink <- mdl_data_b4freeze_pooled %>% filter(site=='rink')
-mdl_rink <- glm(narwhal ~ temp_surf+temp_deep+salt_surf+salt_deep+
-                  ice_cover_percent+runoff+glacier_length+DOY,
-                data = mdl_data_rink,family=binomial(link="logit"),na.action="na.fail")
+mdl_data_rink <- mdl_data_open_water_pooled %>% filter(site=='rink')
+mdl_rink <- glm(narwhal ~
+                    temp_surf+
+                    ice_cover_percent+
+                    runoff_racmo+
+                    glacier_length+
+                    noise_4kHz+
+                    year+
+                    DOY,
+                  data = mdl_data_rink,
+                  family=binomial(link="logit"),
+                  na.action="na.fail")
 summary(mdl_rink)
-par(mfrow = c(2,2))
-plot(mdl_rink)
 
 ## Kong Oscar ----------------------------------------------
-mdl_data_kong <- mdl_data_b4freeze_pooled %>% filter(site=='kong')
-mdl_kong <- glm(narwhal ~ temp_surf+temp_deep+salt_surf+salt_deep+
-                  ice_cover_percent+runoff+glacier_length+DOY,
-    data = mdl_data_kong,family=binomial(link="logit"),na.action="na.fail")
+mdl_data_kong <- mdl_data_open_water_pooled %>% filter(site=='kong')
+mdl_kong <- glm(narwhal ~
+                    temp_surf+
+                    ice_cover_percent+
+                    runoff_racmo+
+                    glacier_length+
+                    noise_4kHz+
+                    year+
+                    DOY,
+                  data = mdl_data_kong,
+                  family=binomial(link="logit"),
+                  na.action="na.fail")
 summary(mdl_kong)
-par(mfrow = c(2,2))
-plot(mdl_kong)
 
 ## Sverdrup ------------------------------------------------
-mdl_data_sver <- mdl_data_b4freeze_pooled %>% filter(site=='sver')
-mdl_sver <- glm(narwhal ~ temp_surf+temp_deep+salt_surf+salt_deep+
-                  ice_cover_percent+runoff+glacier_length+DOY,
-    data = mdl_data_sver,family=binomial(link="logit"),na.action="na.fail")
+mdl_data_sver <- mdl_data_open_water_pooled %>% filter(site=='sver')
+mdl_sver <- glm(narwhal ~
+                    temp_surf+
+                    ice_cover_percent+
+                    runoff_racmo+
+                    glacier_length+
+                    noise_4kHz+
+                    DOY,
+                  data = mdl_data_sver,
+                  family=binomial(link="logit"),
+                  na.action="na.fail")
 summary(mdl_sver)
-par(mfrow = c(2,2))
-plot(mdl_sver)
 
 ```
 
@@ -161,16 +301,27 @@ par(mai = c(0.9, 0.9, 0.1, 0.1),
 omi = c(0, 0, 0, 0),
 cex.lab = 1)
 ## plot resids vs eta
-binnedplot(fitted(mdl_global_pooled), 
-           residuals(mdl_global_pooled), las = 1, pch = 16,
+binnedplot(fitted(mdl_global), 
+           residuals(mdl_global), las = 1, pch = 16,
+           ylab = "Residuals", xlab = "Fitted values",main = "")
+
+binnedplot(fitted(mdl_global_whales), 
+           residuals(mdl_global_whales), las = 1, pch = 16,
            ylab = "Residuals", xlab = "Fitted values",main = "")
 
 ## compute R^2
 # deviances
-nn <- length(mdl_data_b4freeze_pooled$time)
-DM_mod <- mdl_global_pooled$deviance
-D0_mod <- mdl_global_pooled$null.deviance
+# for open water period
+nn <- length(mdl_data_open_water_pooled$time)
+DM_mod <- mdl_global$deviance
+D0_mod <- mdl_global$null.deviance
 # R^2
+(R2 <- (1 - exp((DM_mod - D0_mod) / nn)) / (1 - exp(-D0_mod / nn)))
+
+# for period when whales were in the area
+nn <- length(mdl_data_pooled_whales$time)
+DM_mod <- mdl_global_whales$deviance
+D0_mod <- mdl_global_whales$null.deviance
 (R2 <- (1 - exp((DM_mod - D0_mod) / nn)) / (1 - exp(-D0_mod / nn)))
 
 ## leverages--------------------------------------------------------
@@ -178,9 +329,9 @@ D0_mod <- mdl_global_pooled$null.deviance
 par(mai = c(0.9, 1, 0.1, 0.1),
 omi = c(0, 0, 0, 0),
 cex.lab = 1)
-levs <- hatvalues(mdl_global_pooled)
+levs <- hatvalues(mdl_global_whales)
 ## threshhold value
-h_crit <- 2 * length(coef(mdl_global_pooled)) / nn
+h_crit <- 2 * length(coef(mdl_global_whales)) / nn
 
 ## halfnormal plot
 faraway::halfnorm(levs, las = 1, ylab = "")
@@ -194,137 +345,39 @@ par(mai = c(0.9, 0.9, 0.1, 0.1),
 omi = c(0, 0, 0, 0),
 cex.lab = 1)
 ## halfnormal plot
-CD <- cooks.distance(mdl_global_pooled)
+CD <- cooks.distance(mdl_global_whales)
 faraway::halfnorm(CD, las = 1, ylab = "")
 mtext(side = 2, text = "Sorted Data", line = 3.5)
 
 ## H-L test with 8 groups
 # A non-significant p value indicates that there is no evidence that the observed and expected frequencies differ (i.e., evidence of good fit).
 library(generalhoslem)
-generalhoslem::logitgof(obs = mdl_data_b4freeze_pooled$narwhal,
-                        exp = fitted(mdl_global_pooled), g = 8)
+generalhoslem::logitgof(obs = mdl_data_open_water_pooled$narwhal,
+                        exp = fitted(mdl_global), g = 8)
+
+generalhoslem::logitgof(obs = mdl_data_pooled_whales$narwhal,
+                        exp = fitted(mdl_global_whales), g = 8)
 ```
 
 
-```{r scaled data}
-# Models using scaled data -------------------------------------------
-
-mdl_ice <- glm(narwhal ~
-                    temp_surf,data = model_data_pooled,
-                  family=binomial(link="logit"),na.action="na.fail")
-
-# model with device - SCALED
-mdl_global <- glm(narwhal ~
-                    runoff+site+salt_surf+salt_deep+temp_surf+
-                    temp_deep+ice_cover_percent+site_length+DOY,
-    data = model_data_scale,family=binomial(link="logit"),na.action="na.fail")
-
-# model with device - SCALED
-mdl_global <- glmmTMB(narwhal ~
-                    runoff+I(runoff^2)+
-                    site+salt_surf+salt_deep+temp_surf+
-                    temp_deep+ice_cover_percent+glacier_length+DOY,
-    data = model_data_scale,family=binomial(link="logit"),na.action="na.fail")
-
-# print summary output
-summary(mdl_global)
-par(mfrow = c(2,2))
-plot(mdl_global)
-plot_model(mdl_global,type="pred")
-
-```
-
-
-```{r dredge}
+```{r dredge, eval=FALSE}
 ## use dredge function to run all model combinations ======================
-dredge_mdl <- dredge(mdl_global_pooled)
+dredge_mdl_soundtrap <- dredge(mdl_global_soundtrap)
+dredge_mdl_soundtrap
+
+dredge_mdl_aural <- dredge(mdl_global_aural)
+dredge_mdl_aural
+
+dredge_mdl <- dredge(mdl_global)
 dredge_mdl
-```
 
-
-
-```{r}
-library(sjPlot)
-```
-
-
-```{r fit best model}
-# model with 'device' variable
-mdl_best <- glm(narwhal ~ site+glacier_length+runoff+salt_deep+ice_cover_percent,
-                  data = mdl_data_b4freeze_pooled,family=binomial(link="logit"),na.action="na.fail")
-
-summary(mdl_best)
-plot_model(mdl_best, type='pred',ci.lvl = NA)
-
-## plot deviance residuals------------------------------------------
-## set plot area
-par(mai = c(0.9, 0.9, 0.1, 0.1),
-omi = c(0, 0, 0, 0),
-cex.lab = 1)
-## plot resids vs eta
-binnedplot(fitted(mdl_best), residuals(mdl_best), las = 1, pch = 16,
-ylab = "Residuals", xlab = "Fitted values",
-main = "")
-
-## compute R^2
-# deviances
-nn <- length(mdl_data_b4freeze_pooled$time)
-DM_mod <- mdl_best$deviance
-D0_mod <- mdl_best$null.deviance
-# R^2
-(R2 <- (1 - exp((DM_mod - D0_mod) / nn)) / (1 - exp(-D0_mod / nn)))
+dredge_mdl <- dredge(mdl_global_whales)
+dredge_mdl
 
 ```
 
-```{r check autocorrelation}
-acf(resid(mdl_global_pooled))
-```
-
-
-```{r RUN MODEL}
-library(sjPlot)
-library(lme4)
-library(MuMIn)
-
-model_data <- model_vars_df %>% mutate_at(vars(runoff,salt_surf,temp_surf,salt_deep,temp_deep,ice_cover_percent,
-                                 velocity,glacier_length,DOY),scale) %>% 
-  mutate_at(vars(runoff,salt_surf,temp_surf,salt_deep,temp_deep,ice_cover_percent,
-                                 velocity,glacier_length,DOY),as.numeric) %>% drop_na()
-
-samwise <- glm(narwhal ~ runoff+site+salt_surf+salt_deep+temp_surf+temp_deep+ice_cover_percent+velocity+glacier_length+DOY,
-    data = model_data,family=binomial(link="logit"),na.action="na.fail")
-summary(samwise)
-par(mfrow = c(2,2))
-plot(samwise)
-
-samwise_dredge <- dredge(samwise)
-
-
-plot_model(samwise,type="pred")
-
-samwise <- glm(narwhal ~ runoff+site+salt_surf+ice_cover_percent+velocity+DOY,
-    data = model_data,family=binomial(link="logit"),na.action="na.fail")
-summary(samwise)
-
-plot_model(samwise,type="pred")
-
-
-library(mgcv)
-
-matwise <- gam(narwhal ~ s(runoff)+site+s(salt_surf)+s(salt_deep)+s(temp_surf)+s(temp_deep)+s(ice_cover_percent)+s(velocity)+s(glacier_length)+s(DOY, bs = "cc"),
-    data = model_data,family=binomial(link="logit"),na.action="na.fail")
-
-matwise <- gam(narwhal ~ site+s(salt_surf)+s(salt_deep)+s(temp_surf)+s(temp_deep)+s(glacier_length)+s(DOY, bs = "cc"),
-    data = model_data,family=binomial(link="logit"),na.action="na.fail")
-
-par(mfrow = c(2,2))
-gam.check(matwise)
-dev.off()
-
-summary(matwise)
-
-library("mgcViz")
-print(plot(getViz(matwise), allterms = T), pages = 1)
-
+```{r check autocorrelation, eval=FALSE}
+acf(resid(mdl_global))
+acf(resid(mdl_global_whales))
 ```
 
