@@ -226,6 +226,10 @@ model_vars_pooled_df <- runoff_racmo %>%
 ```{r sanity check}
 # check to make sure values are 
 model_vars_df %>% filter(time=='2019-09-30')
+
+# calculate how many days we have narwhal observations
+days <- unique(model_vars_df %>% dplyr::select(time,narwhal) %>% drop_na() %>% dplyr::select(time))
+length(days$time)
 ```
 
 ```{r corrplot}

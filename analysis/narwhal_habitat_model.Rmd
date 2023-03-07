@@ -30,20 +30,25 @@ load(here('data-cleaning_R/narwhal_model_data_whales.rdata')) # only observation
 
 ## Compare detections in 2019
 
-```{r aural and soundtrap detections 2019}
+```{r narwhal detection totals}
 ## pool soundtrap and aural detections for 2019 data (i.e., take only one obs/day for each site)
 mdl_data_open_water_pooled_2019 <- mdl_data_open_water %>% group_by(site,time) %>% 
   filter(year==2019, narwhal==max(narwhal),(row_number()==n()))
-
+## pool detections for entire dataset (i.e., pool 2019 but retain 2018 detections)
 mdl_data_open_water_pooled <- mdl_data_open_water %>% group_by(site,time) %>% 
+  filter(narwhal==max(narwhal),(row_number()==n())) %>% dplyr::select(-device)
+## pool detections for 'whale' data (=only when whales were in the region)
+mdl_data_whales_pooled <- mdl_data_whales %>% group_by(site,time) %>% 
   filter(narwhal==max(narwhal),(row_number()==n())) %>% dplyr::select(-device)
 
 ## identify how many detections from the same day occurred at more than one site
+length(unique(mdl_data_open_water_pooled$time)) # number of days (obs) for open water period
 sum(mdl_data_open_water_pooled$narwhal) # total of 93 detections over two years at 3 sites
 narwhal_dets <- mdl_data_open_water_pooled %>% filter(narwhal==1) # number of days that narwhals were detected
-length(unique(narwhal_dets$time))
+length(unique(narwhal_dets$time)) # number of unique days when narwhals were identified
 
-mdl_data_open_water_pooled %>% dplyr::select(time, site, narwhal) %>% pivot_wider(names_from = site, values_from = narwhal) %>% mutate(rowsums = kong + rink + sver) %>% filter(rowsums>1)
+## determine how many days whales were seen at more than one glacier front
+mdl_data_open_water_pooled %>% dplyr::select(time, site, narwhal) %>% pivot_wider(names_from = site, values_from = narwhal) %>% mutate(rowsums = sum(kong,rink,sver,na.rm=TRUE)) %>% filter(rowsums>1)
 
 ## tally up total detections for each site for a given year
 rink_2018 <- mdl_data_open_water_pooled %>% filter(year==2018, site=='rink')
@@ -61,7 +66,7 @@ sum(sver_2018$narwhal)
 
 ```
 
-Out of the 77 days that narwhals were detected, only 5 of those days were occasions when whales were detected at two locations on the same day. Whales were never detected at three locations on the same day.
+Out of the 77 days that narwhals were detected, 16 of those days were occasions when whales were detected at two locations on the same day. Whales were never detected at three locations on the same day in 2018.
 
 Totals between each year/site
 
@@ -80,14 +85,15 @@ Totals between each year/site
 aural_2019 <- mdl_data_open_water %>% group_by(site) %>% filter(year==2019,device=='aural') %>% dplyr::select(time,narwhal) %>% rename(narwhal_aural=narwhal)
 sound_2019 <- mdl_data_open_water %>% group_by(site) %>%  filter(year==2019,device=='soundtrap') %>% dplyr::select(time,narwhal)%>% rename(narwhal_sound=narwhal)
 
-compare <- aural_2019 %>% group_by(site) %>%  left_join(sound_2019,by="time") %>% filter(site.x==site.y, narwhal_aural==1 &narwhal_sound==0) &narwhal_sound==0
-compare
+compare <- aural_2019 %>% group_by(site) %>%  left_join(sound_2019,by="time") %>% filter(site.x==site.y, narwhal_aural==1 & narwhal_sound==0)
+compare # zero rows = no aural detections that were not picked up by soundtrap
 
+## check sums across years
 sum(mdl_data_open_water_pooled$narwhal)
 mdl_data_open_water %>% filter(year==2018) %>% dplyr::select(narwhal) %>% sum()
 mdl_data_open_water %>% filter(year==2019,device=='soundtrap') %>% dplyr::select(narwhal) %>% sum()
 
-## double check using different method
+## double check comparison using different method
 aural_2019_kong <- aural_2019 %>% filter(site=='kong') 
 sound_2019_kong <- sound_2019 %>% filter(site=='kong') 
 aural_2019_rink <- aural_2019 %>% filter(site=='rink') 
@@ -103,40 +109,54 @@ aural_2019_rink %>% left_join(sound_2019_rink,by="time") %>% filter(narwhal_aura
 ## normalize at the start of each year
 ref <- mdl_data_open_water_pooled %>% group_by(year, site) %>% filter(time==min(as.Date(time))) %>% dplyr::select(site,year,glacier_length) %>% dplyr::rename(length_ref=glacier_length)
 
-mdl_data_pooled <- mdl_data_open_water_pooled %>% left_join(ref,by=c("site","year")) %>% mutate(glacier_len_std = glacier_length - length_ref)
+## add normalized glacier length variable and drop unneeded variables
+mdl_data_pooled <- mdl_data_open_water_pooled %>% left_join(ref,by=c("site","year")) %>% mutate(glacier_len_norm = glacier_length - length_ref) %>% dplyr::select(!c(length_ref,noise_100Hz,noise_2kHz,runoff_mar,glacier_length))
 
 ## sanity check plot
-mdl_data_pooled %>% ggplot(aes(x=as.Date(time),y=glacier_len_std,color=site))+
+mdl_data_open_water_pooled %>% ggplot(aes(x=as.Date(time),y=glacier_length,color=site))+
+  geom_point()
+mdl_data_pooled %>% ggplot(aes(x=as.Date(time),y=glacier_len_norm,color=site))+
   geom_point()
 
+## do the same for the other dataset: when only whales were present
+ref <- mdl_data_whales_pooled %>% group_by(year, site) %>% filter(time==min(as.Date(time))) %>% dplyr::select(site,year,glacier_length) %>% dplyr::rename(length_ref=glacier_length)
+
+mdl_data_pooled_whales <- mdl_data_whales_pooled %>% left_join(ref,by=c("site","year")) %>% mutate(glacier_len_norm = glacier_length - length_ref) %>% dplyr::select(!c(length_ref,noise_100Hz,noise_2kHz,runoff_mar,glacier_length))
+
 ```
-
-```{r whales only}
-# only select period when whales were in the area
-# filter all data before these dates
-mdl_data_whales2018 <- mdl_data_open_water_pooled %>% filter(year==2018) %>% 
-  filter(DOY<285) %>% drop_na()
-mdl_data_whales2019 <- mdl_data_open_water_pooled %>% filter(year==2019) %>% 
-  filter(DOY>100,DOY<292) %>% drop_na()
-
-mdl_data_pooled_whales <- rbind(mdl_data_whales2018,mdl_data_whales2019)
-```
-
 
 ```{r check correlations}
+## check correlations (again) now that glacier length has been normalized
 
-mdl_data_corr <- mdl_data_open_water_pooled %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year, noise_100Hz, noise_2kHz, runoff_mar)) %>% cor(use = "complete.obs")
-
-mdl_data_corr <- mdl_data_pooled %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year, noise_100Hz, noise_2kHz, runoff_mar)) %>% cor(use = "complete.obs")
-
-# salt_surf, salt_deep, and temp_deep all correlated with one another and with DOY
-# keep DOY and temp_surf
-mdl_data_corr <- mdl_data_open_water_pooled %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year, noise_100Hz, noise_2kHz, velocity, runoff_mar, salt_surf, salt_deep, temp_deep)) %>% cor(use = "complete.obs")
-
-mdl_data_corr <- mdl_data_pooled %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year, noise_100Hz, noise_2kHz, velocity, runoff_mar, salt_surf, salt_deep, temp_deep)) %>% cor(use = "complete.obs")
-
-# plot correlation test
+## open water period
+mdl_data_corr <- mdl_data_pooled %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year)) %>% cor(use = "complete.obs")
+## plot correlation test
 corrplot::corrplot(mdl_data_corr, method = 'number')
+
+## Hide upper triangle and export csv of correlations
+mdl_data_pooled_tbl <- mdl_data_pooled %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year)) %>% cor(use = "complete.obs") %>% round(2) %>% as.data.frame()
+
+mdl_data_pooled_tbl[upper.tri(mdl_data_pooled_tbl)]<-""
+mdl_data_pooled_tbl<-as.data.frame(mdl_data_pooled_tbl)
+write.csv(mdl_data_pooled_tbl, here("analysis/mdl_data_pooled_correlations.csv"),row.names = TRUE)
+
+## salt_surf, salt_deep, and temp_deep all correlated with one another and with DOY
+## keep DOY and temp_surf
+mdl_data_corr <- mdl_data_pooled %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year, velocity, salt_surf, salt_deep, temp_deep)) %>% cor(use = "complete.obs")
+
+## plot correlation test
+corrplot::corrplot(mdl_data_corr, method = 'number')
+
+## -----
+## do the same for the subset of data for when whales were occupying Melville Bay
+mdl_data_corr <- mdl_data_pooled_whales %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year)) %>% cor(use = "complete.obs")
+
+# Hide upper triangle and export csv of correlations
+mdl_data_pooled_whales_tbl <- mdl_data_pooled_whales %>% ungroup() %>% dplyr::select(!c(narwhal, time, site, year)) %>% cor(use = "complete.obs") %>% round(2) %>% as.data.frame()
+
+mdl_data_pooled_whales_tbl[upper.tri(mdl_data_pooled_whales_tbl)]<-""
+mdl_data_pooled_whales_tbl<-as.data.frame(mdl_data_pooled_whales_tbl)
+write.csv(mdl_data_pooled_whales_tbl, here("analysis/mdl_data_pooled_whales_correlations.csv"),row.names = TRUE)
 
 ```
 
@@ -147,15 +167,16 @@ corrplot::corrplot(mdl_data_corr, method = 'number')
 ## logistic regression 
 ## glm with binomial response and logit link 
 mdl_global <- glm(narwhal ~
-                    temp_surf+
+                    temp_surf+I(temp_surf^2)+
                     ice_cover_percent+
                     runoff_racmo+
-                    glacier_length+
+                    velocity+
+                    glacier_len_norm+
                     noise_4kHz+
                     year+
-                    DOY+
+                    DOY+I(DOY^2)+
+                    # salt_deep+I(salt_deep^2)+
                     site,
-                  # data = mdl_data_open_water_pooled,
                   data = mdl_data_pooled,
                   family=binomial(link="logit"),
                   na.action="na.fail")
@@ -163,16 +184,21 @@ mdl_global <- glm(narwhal ~
 # print summary output
 summary(mdl_global)
 faraway::sumary(mdl_global)
+# run all possible model combinations
+dredge_mdl <- dredge(mdl_global)
+head(dredge_mdl)
 
 ## model using data for time period when whales were in the area
+## dropped salt_deep and DOY since these were correlated with other vars
 mdl_global_whales <- glm(narwhal ~
-                    temp_surf+
+                    temp_surf+I(temp_surf^2)+
+                    temp_deep+I(temp_deep^2)+
+                    salt_surf+I(salt_surf^2)+
                     ice_cover_percent+
                     runoff_racmo+
-                    glacier_length+
+                    glacier_len_norm+
                     noise_4kHz+
-                    as.factor(year)+
-                    DOY+
+                    year+
                     site,
                   data = mdl_data_pooled_whales,
                   family=binomial(link="logit"),
@@ -181,16 +207,37 @@ mdl_global_whales <- glm(narwhal ~
 # print summary output
 summary(mdl_global_whales)
 faraway::sumary(mdl_global_whales)
+
+dredge_mdl <- dredge(mdl_global_whales)
+dredge_mdl
+head(dredge_mdl)
 ```
 
+```{r best model - open water}
+mdl_best <- glm(narwhal ~
+                    temp_surf+
+                    ice_cover_percent+
+                    runoff_racmo+
+                    DOY+
+                    site,
+                  data = mdl_data_pooled,
+                  family=binomial(link="logit"),
+                  na.action="na.fail")
+
+# print summary output
+summary(mdl_best)
+faraway::sumary(mdl_best)
+
+exp(confint(mdl_best))
+
+# reference this website: http://www.amelia.mn/sds291/labs/lab_logistic_regression.html
+```
 
 
 ```{r}
 library(sjPlot)
 plot_model(mdl_global_whales)
 plot_model(mdl_global_whales, type = 'pred')
-
- 
 ```
 
 
