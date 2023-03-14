@@ -112,6 +112,8 @@ ref <- mdl_data_open_water_pooled %>% group_by(year, site) %>% filter(time==min(
 ## add normalized glacier length variable and drop unneeded variables
 mdl_data_pooled <- mdl_data_open_water_pooled %>% left_join(ref,by=c("site","year")) %>% mutate(glacier_len_norm = glacier_length - length_ref) %>% dplyr::select(!c(length_ref,noise_100Hz,noise_2kHz,runoff_mar,glacier_length))
 
+mdl_data <- mdl_data_open_water %>% left_join(ref,by=c("site","year")) %>% mutate(glacier_len_norm = glacier_length - length_ref) %>% dplyr::select(!c(length_ref,noise_100Hz,noise_2kHz,runoff_mar,glacier_length))
+
 ## sanity check plot
 mdl_data_open_water_pooled %>% ggplot(aes(x=as.Date(time),y=glacier_length,color=site))+
   geom_point()
@@ -172,14 +174,21 @@ mdl_data_pooled <- mdl_data_pooled %>% mutate_at(vars(year), list(factor))
 
 ## run model
 mdl_global_open_water <- glm(narwhal ~ 
-                               temp_surf+I(temp_surf^2)+
                                ice_cover_percent+
                                runoff_racmo+
                                velocity+
                                glacier_len_norm+
                                noise_4kHz+
                                year+
+                               temp_surf+I(temp_surf^2)+
+                               salt_deep+I(salt_deep^2)+
                                DOY+I(DOY^2)+
+                               DOY:temp_surf+
+                               DOY:salt_deep+
+                               I(DOY^2):I(temp_surf^2)+
+                               I(DOY^2):I(salt_deep^2)+
+                               DOY:ice_cover_percent+
+                               ice_cover_percent:salt_deep+
                                site,
                              data = mdl_data_pooled,
                              family=binomial(link="logit"),
@@ -389,13 +398,12 @@ plot_model(mdl_best_whales, type = 'pred',
 
 ```
 
-
 Since we know the soundtrap detected more animals, I will run two separate models: one for all aural detections and one for soundtrap detections.
 
 ```{r run glm | separate aural and soundtrap models}
 ## model for only aural data (2018 and 2019)
 ## select only aural data
-mdl_data_open_water_aural <- mdl_data_open_water %>% filter(device=='aural')
+mdl_data_open_water_aural <- mdl_data %>% filter(device=='aural')
 
 mdl_global_aural <- glm(narwhal ~
                     temp_surf+I(temp_surf^2)+
@@ -415,7 +423,8 @@ mdl_global_aural <- glm(narwhal ~
 summary(mdl_global_aural)
 faraway::sumary(mdl_global_aural)
 
-dredge(mdl_global_aural)
+aural_dredge <- dredge(mdl_global_aural)
+head(aural_dredge)
 
 # run best model for aural data
 mdl_best_aural <- glm(narwhal ~
@@ -432,16 +441,16 @@ plot_model(mdl_best_aural, type = 'pred',
 
 ## model for only soundtrap data (2019)
 ## select only aural data
-mdl_data_open_water_soundtrap <- mdl_data_open_water %>% filter(device=='soundtrap')
+mdl_data_open_water_soundtrap <- mdl_data %>% filter(device=='soundtrap')
 mdl_data_whales_soundtrap <- mdl_data_whales %>% filter(device=='soundtrap')
 
 mdl_global_soundtrap <- glm(narwhal ~
                     temp_surf+I(temp_surf^2)+
                     ice_cover_percent+
                     runoff_racmo+
-                    glacier_length+
+                    glacier_len_norm+
                     noise_4kHz+
-                    # DOY+I(DOY^2)+
+                    DOY+I(DOY^2)+
                     salt_deep+I(salt_deep^2)+
                     site,
                   data = mdl_data_open_water_soundtrap,
@@ -452,7 +461,8 @@ mdl_global_soundtrap <- glm(narwhal ~
 summary(mdl_global_soundtrap)
 faraway::sumary(mdl_global_soundtrap)
 
-dredge(mdl_global_soundtrap)
+soundtrap_dredge <- dredge(mdl_global_soundtrap)
+head(soundtrap_dredge)
 
 # run best model for soundtrap data
 mdl_best_soundtrap <- glm(narwhal ~
