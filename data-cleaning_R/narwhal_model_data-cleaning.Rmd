@@ -105,27 +105,27 @@ sea_ice_sver <- read.csv(paste(data_dir,"sea_ice/sverdrup_seaice_cover_1D.csv",s
 sea_ice<-rbind(sea_ice_rink,sea_ice_kong,sea_ice_sver)
 
 # salinity
-salt_surf_fish <- read.csv(paste(data_dir,"salinity/fisher_salt_120m_1D.csv",sep=''))%>% mutate(site="rink")
+salt_shallow_fish <- read.csv(paste(data_dir,"salinity/fisher_salt_120m_1D.csv",sep=''))%>% mutate(site="rink")
 salt_deep_fish <- read.csv(paste(data_dir,"salinity/fisher_salt_220m_1D.csv",sep=''))%>% mutate(site="rink")
-salt_surf_kong <- read.csv(paste(data_dir,"salinity/kongoscar_salt_120m_1D.csv",sep=''))%>% mutate(site="kong") %>% mutate(time=as.character(as.Date(time,format='%m/%d/%Y')))
+salt_shallow_kong <- read.csv(paste(data_dir,"salinity/kongoscar_salt_120m_1D.csv",sep=''))%>% mutate(site="kong") %>% mutate(time=as.character(as.Date(time,format='%m/%d/%Y')))
 salt_deep_kong <- read.csv(paste(data_dir,"salinity/kongoscar_salt_220m_1D.csv",sep=''))%>% mutate(site="kong")
-salt_surf_rink <- read.csv(paste(data_dir,"salinity/rink_salt_120m_1D.csv",sep=''))%>% mutate(site="rink")
+salt_shallow_rink <- read.csv(paste(data_dir,"salinity/rink_salt_120m_1D.csv",sep=''))%>% mutate(site="rink")
 salt_deep_rink <- read.csv(paste(data_dir,"salinity/rink_salt_220m_1D.csv",sep=''))%>% mutate(site="rink")
-salt_surf_sver <- read.csv(paste(data_dir,"salinity/sverdrup_salt_120m_1D.csv",sep=''))%>% mutate(site="sver")
+salt_shallow_sver <- read.csv(paste(data_dir,"salinity/sverdrup_salt_120m_1D.csv",sep=''))%>% mutate(site="sver")
 salt_deep_sver <- read.csv(paste(data_dir,"salinity/sverdrup_salt_220m_1D.csv",sep=''))%>% mutate(site="sver")
-salt_surf<-rbind(salt_surf_fish,salt_surf_kong,salt_surf_rink,salt_surf_sver) %>% rename(salt_surf=salinity)
+salt_shallow<-rbind(salt_shallow_fish,salt_shallow_kong,salt_shallow_rink,salt_shallow_sver) %>% rename(salt_shallow=salinity)
 salt_deep<-rbind(salt_deep_fish,salt_deep_kong,salt_deep_rink,salt_deep_sver) %>% rename(salt_deep=salinity)
 
 # temperature
-temp_surf_fish <- read.csv(paste(data_dir,"temperature/fisher_temp_120m_1D.csv",sep=''))%>% mutate(site="rink")
+temp_shallow_fish <- read.csv(paste(data_dir,"temperature/fisher_temp_120m_1D.csv",sep=''))%>% mutate(site="rink")
 temp_deep_fish <- read.csv(paste(data_dir,"temperature/fisher_temp_220m_1D.csv",sep=''))%>% mutate(site="rink")
-temp_surf_kong <- read.csv(paste(data_dir,"temperature/kongoscar_temp_120m_1D.csv",sep=''))%>% mutate(site="kong")
+temp_shallow_kong <- read.csv(paste(data_dir,"temperature/kongoscar_temp_120m_1D.csv",sep=''))%>% mutate(site="kong")
 temp_deep_kong <- read.csv(paste(data_dir,"temperature/kongoscar_temp_220m_1D.csv",sep=''))%>% mutate(site="kong")
-temp_surf_rink <- read.csv(paste(data_dir,"temperature/rink_temp_120m_1D.csv",sep=''))%>% mutate(site="rink")
+temp_shallow_rink <- read.csv(paste(data_dir,"temperature/rink_temp_120m_1D.csv",sep=''))%>% mutate(site="rink")
 temp_deep_rink <- read.csv(paste(data_dir,"temperature/rink_temp_220m_1D.csv",sep=''))%>% mutate(site="rink")
-temp_surf_sver <- read.csv(paste(data_dir,"temperature/sverdrup_temp_120m_1D.csv",sep=''))%>% mutate(site="sver")
+temp_shallow_sver <- read.csv(paste(data_dir,"temperature/sverdrup_temp_120m_1D.csv",sep=''))%>% mutate(site="sver")
 temp_deep_sver <- read.csv(paste(data_dir,"temperature/sverdrup_temp_220m_1D.csv",sep=''))%>% mutate(site="sver")
-temp_surf <- rbind(temp_surf_fish,temp_surf_kong,temp_surf_rink,temp_surf_sver) %>% rename(temp_surf=temperature)
+temp_shallow <- rbind(temp_shallow_fish,temp_shallow_kong,temp_shallow_rink,temp_shallow_sver) %>% rename(temp_shallow=temperature)
 temp_deep <- rbind(temp_deep_fish,temp_deep_kong,temp_deep_rink,temp_deep_sver) %>% rename(temp_deep=temperature)
 
 # ## iceberg data
@@ -193,9 +193,9 @@ glacier_vars_df <- read.csv(paste(data_dir,"narwhal_model_glacier_vars.csv",sep=
 # ALL narwhal detections (aural + soundtrap)
 model_vars_df <- runoff_racmo %>% 
   left_join(runoff_mar, by = c('time', 'site')) %>%
-  left_join(salt_surf, by = c('time', 'site')) %>% 
+  left_join(salt_shallow, by = c('time', 'site')) %>% 
   left_join(salt_deep, by = c('time', 'site')) %>%
-  left_join(temp_surf, by = c('time', 'site')) %>%
+  left_join(temp_shallow, by = c('time', 'site')) %>%
   left_join(temp_deep, by = c('time', 'site')) %>%
   left_join(sea_ice, by = c('time', 'site')) %>% 
   left_join(ice_vel, by = c('time', 'site')) %>% 
@@ -209,9 +209,9 @@ model_vars_df <- runoff_racmo %>%
 narwhal_pooled_dets <- narwhal_pooled %>% dplyr::select(narwhal, site, device, time)
 model_vars_pooled_df <- runoff_racmo %>% 
   left_join(runoff_mar, by = c('time', 'site')) %>%
-  left_join(salt_surf, by = c('time', 'site')) %>% 
+  left_join(salt_shallow, by = c('time', 'site')) %>% 
   left_join(salt_deep, by = c('time', 'site')) %>%
-  left_join(temp_surf, by = c('time', 'site')) %>%
+  left_join(temp_shallow, by = c('time', 'site')) %>%
   left_join(temp_deep, by = c('time', 'site')) %>%
   left_join(sea_ice, by = c('time', 'site')) %>% 
   left_join(ice_vel, by = c('time', 'site')) %>% 
@@ -232,29 +232,7 @@ days <- unique(model_vars_df %>% dplyr::select(time,narwhal) %>% drop_na() %>% d
 length(days$time)
 ```
 
-```{r corrplot}
-## check for correlations between all covariates
-
-# detections separated by device
-model_vars_num <- model_vars_df %>% dplyr::select(!c(narwhal, time, site, year, device)) %>% cor(use = "complete.obs")
-# pooled observations
-model_vars_num <- model_vars_pooled_df %>% dplyr::select(!c(narwhal, time, site, year)) %>% cor(use = "complete.obs")
-
-
-model_vars_num <- model_vars_df %>% 
-  dplyr::select(!c(narwhal, time, site, year, device)) %>% 
-  cor(use = "complete.obs")
-
-# remove velocity and extra noise params
-model_vars_num <- model_vars_df %>% 
-  dplyr::select(!c(narwhal, time, site, year, device, runoff_mar, velocity, noise_100Hz, noise_2kHz)) %>% 
-  cor(use = "complete.obs")
-
-# run correlation test
-corrplot::corrplot(model_vars_num, method = 'number')
-```
-
-```{r correlations using complete observations and open water}
+```{r make dataframe for period before fast ice freeze-up}
 ## Check for correlations for only time periods used in model (i.e., open water period and when we have acoustic data)
 # select open water periods
 ## freeze up date in 2018
@@ -266,21 +244,21 @@ model_vars_df %>% dplyr::filter(ice_cover_percent>75,year==2019,DOY>200)
 # 2019-12-23 which is equal to DOY=357 # rink froze up first
 
 ## filter all data before these dates
-mdl_data_open_water2018 <- model_vars_df %>% filter(year==2018) %>% 
+mdl_data_b4freeze2018 <- model_vars_df %>% filter(year==2018) %>% 
   filter(DOY<301) %>% drop_na()
-mdl_data_open_water2019 <- model_vars_df %>% filter(year==2019) %>% 
+mdl_data_b4freeze2019 <- model_vars_df %>% filter(year==2019) %>% 
   filter(DOY>100,DOY<357) %>% drop_na()
 
 ## combine the two years of observations
-mdl_data_open_water <- rbind(mdl_data_open_water2018,mdl_data_open_water2019)
+mdl_data_b4freeze <- rbind(mdl_data_b4freeze2018,mdl_data_b4freeze2019)
 
 ## sanity check plot
-qplot(as.Date(time),salt_surf, geom="point", data = mdl_data_open_water)
+qplot(as.Date(time),salt_shallow, geom="point", data = mdl_data_b4freeze)
 
 # run correlation test
-mdl_data_corr <- mdl_data_open_water %>% dplyr::select(!c(narwhal, time, site, year, DOY, device, noise_100Hz, noise_2kHz)) %>% cor(use = "complete.obs")
+mdl_data_corr <- mdl_data_b4freeze %>% dplyr::select(!c(narwhal, time, site, year, DOY, device, noise_100Hz, noise_2kHz)) %>% cor(use = "complete.obs")
 
-mdl_data_corr <- mdl_data_open_water %>% dplyr::select(!c(narwhal, time, site, year, DOY, device, noise_100Hz, noise_2kHz, salt_deep, temp_deep,velocity,runoff_mar)) %>% cor(use = "complete.obs")
+mdl_data_corr <- mdl_data_b4freeze %>% dplyr::select(!c(narwhal, time, site, year, DOY, device, noise_100Hz, noise_2kHz, salt_deep, temp_deep,velocity,runoff_mar)) %>% cor(use = "complete.obs")
 
 # plot correlation test
 corrplot::corrplot(mdl_data_corr, method = 'number')
@@ -288,7 +266,7 @@ corrplot::corrplot(mdl_data_corr, method = 'number')
 ```
 
 
-```{r}
+```{r select whale occupation period}
 # only select period when whales were in the area
 
 # determine the last day narwhals were observed in the area
@@ -312,35 +290,11 @@ mdl_data_whales <- rbind(mdl_data_whales2018,mdl_data_whales2019)
 ```
 
 
-
-```{r}
-## calculate sample size
-length(mdl_data_open_water$time)
-length(unique(mdl_data_open_water$time))
-
-```
-
-
-Drop velocity because it is highly correlated with glacier terminus (length)
-Consider dropping the deeper CTD terms
-- could keep both surface temp and salinity
-
-
-```{r OPTION - scale vars}
-# scale data and ensure vars are numeric and drop na (=select complete observations)
-model_data_scale <- model_vars_df %>%
-  mutate_at(vars(runoff,salt_surf,temp_surf,salt_deep,temp_deep,ice_cover_percent,
-                 velocity,glacier_length,DOY),as.numeric) %>% 
-  drop_na() %>% 
-  mutate_at(vars(runoff,salt_surf,temp_surf,salt_deep,temp_deep,ice_cover_percent,
-                 velocity,glacier_length,DOY),scale)
-```
-
-
 ```{r export rdata file}
 # export data as rdata file
-save(mdl_data_open_water, file="narwhal_model_data.rdata")
-save(mdl_data_whales, file="narwhal_model_data_whales.rdata")
+# then I can open these files in separate script dedicated to model development
+save(mdl_data_b4freeze, file="data-cleaning_R/narwhal_model_data.rdata")
+save(mdl_data_whales, file="data-cleaning_R/narwhal_model_data_whales.rdata")
 
 ```
 
