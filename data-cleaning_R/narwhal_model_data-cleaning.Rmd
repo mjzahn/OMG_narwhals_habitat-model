@@ -232,60 +232,13 @@ days <- unique(model_vars_df %>% dplyr::select(time,narwhal) %>% drop_na() %>% d
 length(days$time)
 ```
 
-```{r make dataframe for period before fast ice freeze-up}
-## Check for correlations for only time periods used in model (i.e., open water period and when we have acoustic data)
-# select open water periods
-## freeze up date in 2018
-head(model_vars_df %>% dplyr::filter(ice_cover_percent>75,year==2018,site=="sver"))
-# 2018-10-28 which is equal to DOY=301 # sverdrup froze up first
-
-## freeze up date in 2019
-model_vars_df %>% dplyr::filter(ice_cover_percent>75,year==2019,DOY>200)
-# 2019-12-23 which is equal to DOY=357 # rink froze up first
-
-## filter all data before these dates
-mdl_data_b4freeze2018 <- model_vars_df %>% filter(year==2018) %>% 
-  filter(DOY<301) %>% drop_na()
-mdl_data_b4freeze2019 <- model_vars_df %>% filter(year==2019) %>% 
-  filter(DOY>100,DOY<357) %>% drop_na()
-
-## combine the two years of observations
-mdl_data_b4freeze <- rbind(mdl_data_b4freeze2018,mdl_data_b4freeze2019)
-
-## sanity check plot
-qplot(as.Date(time),salt_shallow, geom="point", data = mdl_data_b4freeze)
-
-# run correlation test
-mdl_data_corr <- mdl_data_b4freeze %>% dplyr::select(!c(narwhal, time, site, year, DOY, device, noise_100Hz, noise_2kHz)) %>% cor(use = "complete.obs")
-
-mdl_data_corr <- mdl_data_b4freeze %>% dplyr::select(!c(narwhal, time, site, year, DOY, device, noise_100Hz, noise_2kHz, salt_deep, temp_deep,velocity,runoff_mar)) %>% cor(use = "complete.obs")
-
-# plot correlation test
-corrplot::corrplot(mdl_data_corr, method = 'number')
-
-```
-
-
-```{r select whale occupation period}
+```{r select data for months Aug-Oct}
 # only select period when whales were in the area
+# filter all data before November 1st = DOY 305
+mdl_data_2018 <- model_vars_df %>% filter(year==2018,DOY<305) %>% drop_na()
+mdl_data_2019 <- model_vars_df %>% filter(year==2019,DOY<305 & DOY>100) %>% drop_na()
 
-# determine the last day narwhals were observed in the area
-model_vars_df %>% filter(year==2018, narwhal==1,site=='kong') %>% dplyr::select(time,DOY)
-model_vars_df %>% filter(year==2018, narwhal==1,site=='sver') %>% dplyr::select(time,DOY)
-model_vars_df %>% filter(year==2018, narwhal==1,site=='rink') %>% dplyr::select(time,DOY)
-# 2018-10-11 is last day narwhal was observed in 2018; DOY= 284
-
-model_vars_df %>% filter(year==2019, narwhal==1,site=='kong') %>% dplyr::select(time,DOY)
-model_vars_df %>% filter(year==2019, narwhal==1,site=='rink') %>% dplyr::select(time,DOY)
-# 2019-10-18 is last day narwhal was observed in 2019 (not counting the one outlier event); DOY= 291
-
-# filter all data before these dates
-mdl_data_whales2018 <- model_vars_df %>% filter(year==2018) %>% 
-  filter(DOY<285) %>% drop_na()
-mdl_data_whales2019 <- model_vars_df %>% filter(year==2019) %>% 
-  filter(DOY>100,DOY<292) %>% drop_na()
-
-mdl_data_whales <- rbind(mdl_data_whales2018,mdl_data_whales2019)
+mdl_data <- rbind(mdl_data_2018,mdl_data_2019)
 
 ```
 
@@ -293,8 +246,7 @@ mdl_data_whales <- rbind(mdl_data_whales2018,mdl_data_whales2019)
 ```{r export rdata file}
 # export data as rdata file
 # then I can open these files in separate script dedicated to model development
-save(mdl_data_b4freeze, file="data-cleaning_R/narwhal_model_data.rdata")
-save(mdl_data_whales, file="data-cleaning_R/narwhal_model_data_whales.rdata")
+save(mdl_data, file="data-cleaning_R/narwhal_model_data_aug-oct.rdata")
 
 ```
 
