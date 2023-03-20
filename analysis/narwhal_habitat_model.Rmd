@@ -295,9 +295,9 @@ mdl_gbl <- glm(narwhal ~
                  site+
                  temp_shallow+
                  temp_deep+
-                 DOY+
-                 DOY:temp_shallow+
-                 DOY:temp_deep,
+                 DOY,
+                 # DOY:temp_shallow+
+                 # DOY:temp_deep,
                data = mdl_data_clean,
                family=binomial(link="logit"),
                na.action="na.fail")
@@ -311,6 +311,61 @@ dredge_mdl <- dredge(mdl_gbl)
 head(dredge_mdl)
 
 ```
+
+
+```{r plot noise}
+mdl_data_clean %>% ungroup() %>% filter(year==2018) %>% 
+  dplyr::select(site,noise_4kHz,DOY,time) %>% 
+  ggplot(aes(as.Date(time),noise_4kHz,color=site)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  ylab("ambient noise (dB re 1 uPa)")+
+  xlab("time")+
+  ggtitle("2018 Ambient Noise")+
+  ylim(80,110)+
+  xlim(as.Date("2018-08-01"),as.Date("2018-11-01"))
+
+mdl_data_clean %>% ungroup() %>% filter(year==2019) %>% 
+  dplyr::select(site,noise_4kHz,DOY,time) %>% 
+  ggplot(aes(as.Date(time),noise_4kHz,color=site)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  ylab("ambient noise (dB re 1 uPa)")+
+  xlab("time")+
+  ggtitle("2019 Ambient Noise")+
+  ylim(80,110)+
+  xlim(as.Date("2019-08-01"),as.Date("2019-11-01"))
+  
+## do same plots for sea ice
+mdl_data_clean %>% ungroup() %>% filter(year==2018) %>% 
+  dplyr::select(site,ice_cover_percent,DOY,time) %>% 
+  ggplot(aes(as.Date(time),ice_cover_percent,color=site)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  ylab("ice cover (%)")+
+  xlab("time")+
+  ylim(0,100)+
+  ggtitle("2018 Sea Ice")+
+  xlim(as.Date("2018-08-01"),as.Date("2018-11-01"))
+
+mdl_data_clean %>% ungroup() %>% filter(year==2019) %>% 
+  dplyr::select(site,ice_cover_percent,DOY,time) %>% 
+  ggplot(aes(as.Date(time),ice_cover_percent,color=site)) +
+  geom_point()+
+  geom_line()+
+  theme_bw()+
+  ylab("ice cover (%)")+
+  xlab("time")+
+  ggtitle("2019 Sea Ice")+
+  ylim(0,100)+
+  xlim(as.Date("2019-08-01"),as.Date("2019-11-01"))
+
+```
+
+
 
 
 ```{r global glm - scaled data}
