@@ -243,13 +243,13 @@ for (i in 1:length(variables)){
 ## make sure year is coded as a factor
 mdl_data_clean <- mdl_data_clean %>% mutate_at(vars(year), list(factor))
 
-# removed velocity because the distribution is broken between sites (See plots above)
+# removed velocity because the distribution is broken between sites (see plots above)
 # DOY is correlated with salt_deep (dropping salt_deep)
 # temp_deep and salt_shallow are correlated (dropping salt_shallow)
+# removed sea ice because it is zero for all 2019 data
 
-## run global model with sea ice
-mdl_gbl_ice <- glm(narwhal ~ 
-                 ice_cover_percent+
+## run global model without sea ice
+mdl_gbl <- glm(narwhal ~ 
                  runoff_racmo+
                  glacier_len_norm+
                  noise_4kHz+
@@ -258,46 +258,9 @@ mdl_gbl_ice <- glm(narwhal ~
                  temp_shallow+
                  temp_deep+
                  DOY+
+                 DOY:runoff_racmo+
                  DOY:temp_shallow+
-                 DOY:temp_deep+
-                 ice_cover_percent:DOY+
-                 ice_cover_percent:temp_shallow+
-                 ice_cover_percent:temp_deep,
-               data = mdl_data_clean,
-               family=binomial(link="logit"),
-               na.action="na.fail")
-
-# check vif for collinearity
-round(car::vif(mdl_gbl_ice),3)
-
-# partial residual plots
-crPlots(mdl_gbl_ice)
-
-# print summary output
-summary(mdl_gbl_ice)
-faraway::sumary(mdl_gbl_ice)
-
-# run all possible model combinations
-dredge_mdl_gbl_ice <- dredge(mdl_gbl_ice)
-head(dredge_mdl_gbl_ice)
-
-# export table to csv
-write.csv(as.data.frame(dredge_mdl_gbl_ice), row.names = FALSE,
-          here("analysis/csv_outputs/mdl_results.csv"))
-
-
-## run global model without sea ice
-mdl_gbl <- glm(narwhal ~ 
-                 # runoff_racmo+
-                 glacier_len_norm+
-                 noise_4kHz+
-                 year+
-                 site+
-                 temp_shallow+
-                 temp_deep+
-                 DOY,
-                 # DOY:temp_shallow+
-                 # DOY:temp_deep,
+                 DOY:temp_deep,
                data = mdl_data_clean,
                family=binomial(link="logit"),
                na.action="na.fail")
@@ -310,6 +273,24 @@ faraway::sumary(mdl_gbl)
 dredge_mdl <- dredge(mdl_gbl)
 head(dredge_mdl)
 
+```
+
+```{r run best model}
+## run global model without sea ice
+mdl_best <- glm(narwhal ~ 
+                 runoff_racmo+
+                 year+
+                 DOY,
+               data = mdl_data_clean,
+               family=binomial(link="logit"),
+               na.action="na.fail")
+
+# print summary output
+summary(mdl_best)
+faraway::sumary(mdl_best)
+
+# check vif for collinearity
+round(car::vif(mdl_best),3)
 ```
 
 
@@ -632,23 +613,16 @@ binnedplot(fitted(mdl_global),
            residuals(mdl_global), las = 1, pch = 16,
            ylab = "Residuals", xlab = "Fitted values",main = "")
 
-binnedplot(fitted(mdl_global_whales), 
-           residuals(mdl_global_whales), las = 1, pch = 16,
+binnedplot(fitted(mdl_best), 
+           residuals(mdl_best), las = 1, pch = 16,
            ylab = "Residuals", xlab = "Fitted values",main = "")
 
 ## compute R^2
 # deviances
-# for open water period
-nn <- length(mdl_data_b4freeze_pooled$time)
-DM_mod <- mdl_global$deviance
-D0_mod <- mdl_global$null.deviance
+nn <- length(mdl_data_clean$time)
+DM_mod <- mdl_best$deviance
+D0_mod <- mdl_best$null.deviance
 # R^2
-(R2 <- (1 - exp((DM_mod - D0_mod) / nn)) / (1 - exp(-D0_mod / nn)))
-
-# for period when whales were in the area
-nn <- length(mdl_data_pooled_whales$time)
-DM_mod <- mdl_global_whales$deviance
-D0_mod <- mdl_global_whales$null.deviance
 (R2 <- (1 - exp((DM_mod - D0_mod) / nn)) / (1 - exp(-D0_mod / nn)))
 
 ## leverages--------------------------------------------------------
@@ -656,9 +630,9 @@ D0_mod <- mdl_global_whales$null.deviance
 par(mai = c(0.9, 1, 0.1, 0.1),
 omi = c(0, 0, 0, 0),
 cex.lab = 1)
-levs <- hatvalues(mdl_global_whales)
+levs <- hatvalues(mdl_best)
 ## threshhold value
-h_crit <- 2 * length(coef(mdl_global_whales)) / nn
+h_crit <- 2 * length(coef(mdl_best)) / nn
 
 ## halfnormal plot
 faraway::halfnorm(levs, las = 1, ylab = "")
@@ -672,22 +646,18 @@ par(mai = c(0.9, 0.9, 0.1, 0.1),
 omi = c(0, 0, 0, 0),
 cex.lab = 1)
 ## halfnormal plot
-CD <- cooks.distance(mdl_global_whales)
+CD <- cooks.distance(mdl_best)
 faraway::halfnorm(CD, las = 1, ylab = "")
 mtext(side = 2, text = "Sorted Data", line = 3.5)
 
 ## H-L test with 8 groups
 # A non-significant p value indicates that there is no evidence that the observed and expected frequencies differ (i.e., evidence of good fit).
 library(generalhoslem)
-generalhoslem::logitgof(obs = mdl_data_b4freeze_pooled$narwhal,
-                        exp = fitted(mdl_global), g = 8)
-
-generalhoslem::logitgof(obs = mdl_data_pooled_whales$narwhal,
-                        exp = fitted(mdl_global_whales), g = 8)
+generalhoslem::logitgof(obs = mdl_data_clean$narwhal,
+                        exp = fitted(mdl_best), g = 8)
 ```
 
 ```{r check autocorrelation, eval=FALSE}
-acf(resid(mdl_global_b4freeze))
-acf(resid(mdl_global_whales))
+acf(resid(mdl_best))
 ```
 
