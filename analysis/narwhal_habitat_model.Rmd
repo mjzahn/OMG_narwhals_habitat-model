@@ -245,7 +245,6 @@ for (i in 1:length(variables)){
 ## make sure year is coded as a factor
 mdl_data_clean <- mdl_data_clean %>% mutate_at(vars(year), list(factor))
 
-# removed velocity because the distribution is broken between sites (see plots above)
 # DOY is negatively correlated with salt_deep (dropping salt_deep)
 # temp_deep and salt_shallow are correlated (dropping salt_shallow)
 # removed sea ice because it is zero for all 2019 data
@@ -304,6 +303,7 @@ round(confint(mdl_best),3)
 
 ```
 
+## Exploratory plots for noise and sea ice data
 
 ```{r plot noise}
 mdl_data_clean %>% ungroup() %>% filter(year==2018) %>% 
@@ -356,6 +356,24 @@ mdl_data_clean %>% ungroup() %>% filter(year==2019) %>%
   xlim(as.Date("2019-08-01"),as.Date("2019-11-01"))
 
 ```
+
+```{r investigate ranges in temp and salinity}
+# temperature
+min(mdl_data_clean$temp_shallow)
+min(mdl_data_clean$temp_deep)
+
+max(mdl_data_clean$temp_shallow)
+max(mdl_data_clean$temp_deep)
+
+# salinity
+min(mdl_data_clean$salt_shallow)
+min(mdl_data_clean$salt_deep)
+
+max(mdl_data_clean$salt_shallow)
+max(mdl_data_clean$salt_deep)
+
+```
+
 
 ```{r plot logistic regression result with observations}
 ## runoff ---------------------------------------
