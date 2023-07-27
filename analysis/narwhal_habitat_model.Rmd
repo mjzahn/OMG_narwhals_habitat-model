@@ -46,11 +46,17 @@ mdl_data_pooled <- mdl_data %>% group_by(site,time) %>%
 length(unique(mdl_data_pooled$time)) # number of days (obs) for open water period
 sum(mdl_data_pooled$narwhal) # total of 93 detections over two years at 3 sites (92 not counting outlier)
 narwhal_dets <- mdl_data_pooled %>% filter(narwhal==1) # number of days that narwhals were detected
-length(unique(narwhal_dets$time)) # number of unique days when narwhals were identified (76)
+length(unique(narwhal_dets$time)) # number of unique days when narwhals were identified (77 including outlier)
 
 ## determine how many days whales were seen at more than one glacier front
 mult_det <- mdl_data_pooled %>% dplyr::select(time, site, narwhal) %>% pivot_wider(names_from = site, values_from = narwhal) %>% mutate(rowsums = sum(kong,rink,sver,na.rm=TRUE)) %>% filter(rowsums>1)
 length(mult_det$time)
+
+## determine how many days whales were seen at more than one glacier front each year
+doubles_2018 <- mult_det %>% filter(grepl("2018",time))
+doubles_2019 <- mult_det %>% filter(grepl("2019",time))
+length(doubles_2018$time)
+length(doubles_2019$time)
 
 ## tally up total detections for each site for a given year
 rink_2018 <- mdl_data_pooled %>% filter(year==2018, site=='rink')
@@ -66,6 +72,11 @@ sum(kong_2019$narwhal)
 sver_2018 <- mdl_data_pooled %>% filter(year==2018, site=='sver')
 sum(sver_2018$narwhal)
 
+## extract last detection for each year
+mdl_data_pooled_2018 <- mdl_data_pooled %>% filter(year==2018, narwhal==1)
+mdl_data_pooled_2019 <- mdl_data_pooled %>% filter(year==2019, narwhal==1)
+tail(mdl_data_pooled_2018)
+tail(mdl_data_pooled_2019)
 ```
 
 Out of the 77 days that narwhals were detected, 16 of those days were occasions when whales were detected at two locations on the same day. Whales were never detected at three locations on the same day in 2018.
@@ -90,6 +101,10 @@ sound_2019 <- mdl_data %>% group_by(site) %>%  filter(year==2019,device=='soundt
 
 compare <- aural_2019 %>% group_by(site) %>%  left_join(sound_2019,by="time") %>% filter(site.x==site.y, narwhal_aural==1 & narwhal_sound==0)
 compare # zero rows = no aural detections that were not picked up by soundtrap
+
+## calculate the reverse - how many soundtrap detections were not matched in aurals
+compare <- sound_2019 %>% group_by(site) %>%  left_join(aural_2019,by="time") %>% filter(site.x==site.y, narwhal_sound==1 & narwhal_aural==0)
+compare
 
 ## check sums across years
 sum(mdl_data_pooled$narwhal)

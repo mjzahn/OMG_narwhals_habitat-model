@@ -41,7 +41,7 @@ Additional glacier variables:
 # files = list.files(data_dir='D:/Habitat_model_data/covariate_csv_files',pattern = '*.csv',recursive = TRUE)
 
 # data stored on external harddrive -- update path here
-data_dir <- 'D:/Habitat_model_data/covariate_csv_files/'
+data_dir <- 'H:/Habitat_model_data/covariate_csv_files/'
 
 ## load all data from csv files and add columns to indicate glacier/site and device (where applicable)
 ## then join all data into one dataframe per variable
@@ -239,6 +239,9 @@ mdl_data_2018 <- model_vars_df %>% filter(year==2018,DOY<305) %>% drop_na()
 mdl_data_2019 <- model_vars_df %>% filter(year==2019,DOY<305 & DOY>100) %>% drop_na()
 
 mdl_data <- rbind(mdl_data_2018,mdl_data_2019)
+
+## select only days narwhals were present to find when the outlier point occurred in November 2019
+model_vars_df %>% filter(narwhal==1,year==2019,site=="rink")
 
 ```
 
