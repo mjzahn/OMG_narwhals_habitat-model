@@ -32,6 +32,21 @@ library(raincloudplots)
 load(here("data-cleaning_R/narwhal_model_data_aug-oct.rdata")) 
 ```
 
+```{r pool detections}
+## pool detections across both hydrophones
+mdl_data_pooled <- mdl_data %>% group_by(site,time) %>% 
+  filter(narwhal==max(narwhal),(row_number()==n())) %>% dplyr::select(-device)
+```
+
+```{r determine peak narwhal occurence}
+mdl_data_pooled_group <- mdl_data_pooled %>% mutate(month=substr(time, start = 6, stop = 7)) %>% group_by(month, year) %>%
+summarise(narwhal_sum = sum(narwhal))
+
+mdl_data_pooled_group %>% filter(year==2018)
+mdl_data_pooled_group %>% filter(year==2019)
+```
+
+
 ## Normalize glacier length data
 
 ```{r normalize glacier length data}

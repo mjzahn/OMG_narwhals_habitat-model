@@ -223,6 +223,16 @@ model_vars_pooled_df <- runoff_racmo %>%
 
 ```
 
+```{r pool data and get monthly sums}
+mdl_data_pooled_group <- narwhal_pooled_dets %>% mutate(month=substr(time, start = 6, stop = 7)) %>% 
+  mutate(year=substr(time, start = 1, stop = 4)) %>% 
+  group_by(month, year) %>%
+summarise(narwhal_sum = sum(narwhal))
+
+mdl_data_pooled_group %>% filter(year==2018)
+mdl_data_pooled_group %>% filter(year==2019)
+```
+
 ```{r sanity check}
 # check to make sure values are 
 model_vars_df %>% filter(time=='2019-09-30')
@@ -243,8 +253,12 @@ mdl_data <- rbind(mdl_data_2018,mdl_data_2019)
 ## select only days narwhals were present to find when the outlier point occurred in November 2019
 model_vars_df %>% filter(narwhal==1,year==2019,site=="rink")
 
-```
+## we lose two detections because we didn't have temp/salt data for those days
+model_vars_df %>% filter(narwhal==1,year==2018,site=="rink")
+model_vars_df %>% filter(narwhal==1,year==2018,site=="kong")
+model_vars_df %>% filter(narwhal==1,year==2018,site=="sver")
 
+```
 
 ```{r export rdata file}
 # export data as rdata file
@@ -260,9 +274,6 @@ save(mdl_data, file="data-cleaning_R/narwhal_model_data_aug-oct.rdata")
 ## pool soundtrap and aural detections for 2019 data (i.e., take only one obs/day for each site)
 mdl_data_pooled_2019 <- model_vars_df %>% group_by(site,time) %>% 
   filter(year==2019, narwhal==max(narwhal),(row_number()==n()))
-## pool detections for entire dataset (i.e., pool 2019 but retain 2018 detections)
-model_vars_df_pooled <- model_vars_df %>% group_by(site,time) %>% 
-  filter(narwhal==max(narwhal),(row_number()==n())) %>% dplyr::select(-device)
 
 ## identify how many detections from the same day occurred at more than one site
 length(unique(model_vars_df_pooled$time)) # number of days (obs) for entire sampling period
