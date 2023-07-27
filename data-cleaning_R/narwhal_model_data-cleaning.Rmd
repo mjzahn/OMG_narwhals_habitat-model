@@ -49,7 +49,7 @@ data_dir <- 'H:/Habitat_model_data/covariate_csv_files/'
 # narwhal detections
 narwhal_kong_AU18 <- read.csv(paste(data_dir,"narwhal_detections/Kong_Oscar_2018-2019_AuralM2_daily.csv",sep=''))%>% mutate(site="kong",device="aural") %>% dplyr::select(Time_UTC, narwhal,site,device)
 narwhal_kong_AU19 <- read.csv(paste(data_dir,"narwhal_detections/Nuussuaq_KongOscar_AuralM2_daily.csv",sep=''))%>% mutate(site="kong",device="aural")%>% dplyr::select(Time_UTC, narwhal,site,device)
-narwhal_kong_ST19 <- read.csv(paste(data_dir,"narwhal_detections/Nuussuaq_KongOscar_ST_daily.csv",sep=''))%>% mutate(site="kong",device="soundtrap")%>% dplyr::select(Time_UTC, narwhal,site,device)
+narwhal_kong_ST19 <- read.csv(paste(data_dir,"narwhal_detections/Nuussuaq_KongOscar_ST_daily_wavTime.csv",sep=''))%>% mutate(site="kong",device="soundtrap")%>% dplyr::select(Time_UTC, narwhal,site,device) # wavTime file is actually UTC
 narwhal_rink_AU18 <- read.csv(paste(data_dir,"narwhal_detections/Rink_Glacier_2018-19_AuralM2_daily.csv",sep=''))%>% mutate(site="rink",device="aural")%>% dplyr::select(Time_UTC, narwhal,site,device)
 narwhal_fish_AU19 <- read.csv(paste(data_dir,"narwhal_detections/Rink_Glacier_Fischer_AuralM2_daily.csv",sep=''))%>% mutate(site="rink",device="aural")%>% dplyr::select(Time_UTC, narwhal,site,device)
 narwhal_fish_ST19 <- read.csv(paste(data_dir,"narwhal_detections/Rink_Glacier_Fischer_ST_daily.csv",sep=''))%>% mutate(site="rink",device="soundtrap")%>% dplyr::select(Time_UTC, narwhal,site,device)
@@ -250,6 +250,105 @@ model_vars_df %>% filter(narwhal==1,year==2019,site=="rink")
 # export data as rdata file
 # then I can open these files in separate script dedicated to model development
 save(mdl_data, file="data-cleaning_R/narwhal_model_data_aug-oct.rdata")
+
+```
+
+
+## Summarize narwhal detections
+
+```{r narwhal detection totals}
+## pool soundtrap and aural detections for 2019 data (i.e., take only one obs/day for each site)
+mdl_data_pooled_2019 <- model_vars_df %>% group_by(site,time) %>% 
+  filter(year==2019, narwhal==max(narwhal),(row_number()==n()))
+## pool detections for entire dataset (i.e., pool 2019 but retain 2018 detections)
+model_vars_df_pooled <- model_vars_df %>% group_by(site,time) %>% 
+  filter(narwhal==max(narwhal),(row_number()==n())) %>% dplyr::select(-device)
+
+## identify how many detections from the same day occurred at more than one site
+length(unique(model_vars_df_pooled$time)) # number of days (obs) for entire sampling period
+obs_2018 <- model_vars_df_pooled %>% filter(year==2018)
+obs_2018_jan <- model_vars_df_pooled %>% filter(year==2019,DOY<100)
+obs_2019 <- model_vars_df_pooled %>% filter(year==2019,DOY>100)
+obs_2020 <- model_vars_df_pooled %>% filter(year==2020)
+length(unique(obs_2018$time))+length(unique(obs_2018_jan$time)) # number of days (obs) sampled in 2018
+length(unique(obs_2019$time))+length(unique(obs_2020$time)) # number of days (obs) sampled in 2019
+length(unique(mdl_data$time)) # number of days (obs) for open water period
+
+sum(model_vars_df_pooled$narwhal) # total of 96 detections over two years at 3 sites
+narwhal_dets_total <- model_vars_df_pooled %>% filter(narwhal==1) # number of days that narwhals were detected
+length(unique(narwhal_dets_total$time)) # number of unique days when narwhals were identified (78 including outliers)
+
+## determine how many days whales were seen at more than one glacier front
+mult_det <- model_vars_df_pooled %>% dplyr::select(time, site, narwhal) %>% pivot_wider(names_from = site, values_from = narwhal) %>% mutate(rowsums = sum(kong,rink,sver,na.rm=TRUE)) %>% filter(rowsums>1)
+length(mult_det$time)
+
+## determine how many days whales were seen at more than one glacier front each year
+doubles_2018 <- mult_det %>% filter(grepl("2018",time))
+doubles_2019 <- mult_det %>% filter(grepl("2019",time))
+length(doubles_2018$time)
+length(doubles_2019$time)
+
+## tally up total detections for each site for a given year
+rink_2018 <- model_vars_df_pooled %>% filter(year==2018, site=='rink')
+rink_2019 <- model_vars_df_pooled %>% filter(year==2019, site=='rink')
+sum(rink_2018$narwhal)
+sum(rink_2019$narwhal) # (add outlier that was removed)
+
+kong_2018 <- model_vars_df_pooled %>% filter(year==2018, site=='kong')
+kong_2019 <- model_vars_df_pooled %>% filter(year==2019, site=='kong')
+sum(kong_2018$narwhal)
+sum(kong_2019$narwhal)
+
+sver_2018 <- model_vars_df_pooled %>% filter(year==2018, site=='sver')
+sum(sver_2018$narwhal)
+
+## extract last detection for each year
+model_vars_df_pooled_2018 <- model_vars_df_pooled %>% filter(year==2018, narwhal==1)
+model_vars_df_pooled_2019 <- model_vars_df_pooled %>% filter(year==2019, narwhal==1)
+tail(model_vars_df_pooled_2018)
+tail(model_vars_df_pooled_2019)
+```
+
+Out of the 78 days that narwhals were detected, 18 of those days were occasions when whales were detected at two locations on the same day. Whales were never detected at three locations on the same day in 2018.
+
+Totals between each year/site
+
+2018
+* Rink: 14
+* Kong Oscar: 9
+* Sverdrup: 7
+
+2019
+* Rink: 32
+* Kong Oscar: 34
+
+## Compare detections between Aurals and SoundTraps in 2019
+
+```{r aural vs soundtrap 2019}
+## see whether there are any aural detections that were NOT detected by the soundtrap in 2019
+aural_2019 <- model_vars_df %>% group_by(site) %>% filter(year==2019,device=='aural') %>% dplyr::select(time,narwhal) %>% rename(narwhal_aural=narwhal)
+sound_2019 <- model_vars_df %>% group_by(site) %>%  filter(year==2019,device=='soundtrap') %>% dplyr::select(time,narwhal)%>% rename(narwhal_sound=narwhal)
+
+compare <- aural_2019 %>% group_by(site) %>%  left_join(sound_2019,by="time") %>% filter(site.x==site.y, narwhal_aural==1 & narwhal_sound==0)
+compare # zero rows = no aural detections that were not picked up by soundtrap
+
+## calculate the reverse - how many soundtrap detections were not matched in aurals
+compare <- sound_2019 %>% group_by(site) %>%  left_join(aural_2019,by="time") %>% filter(site.x==site.y, narwhal_sound==1 & narwhal_aural==0)
+compare
+
+## check sums across years
+sum(model_vars_df_pooled$narwhal)
+model_vars_df %>% filter(year==2018) %>% dplyr::select(narwhal) %>% drop_na() %>% sum()
+model_vars_df %>% filter(year==2019,device=='soundtrap') %>% dplyr::select(narwhal) %>% sum()
+
+## double check comparison using different method
+aural_2019_kong <- aural_2019 %>% filter(site=='kong') 
+sound_2019_kong <- sound_2019 %>% filter(site=='kong') 
+aural_2019_rink <- aural_2019 %>% filter(site=='rink') 
+sound_2019_rink <- sound_2019 %>% filter(site=='rink') 
+
+aural_2019_kong %>% left_join(sound_2019_kong,by="time") %>% filter(narwhal_aural==1&narwhal_sound==0)
+aural_2019_rink %>% left_join(sound_2019_rink,by="time") %>% filter(narwhal_aural==1&narwhal_sound==0)
 
 ```
 
