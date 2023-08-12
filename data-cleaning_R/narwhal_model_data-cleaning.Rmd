@@ -336,8 +336,12 @@ Totals between each year/site
 ## Compare detections between Aurals and SoundTraps in 2019
 
 ```{r aural vs soundtrap 2019}
-## see whether there are any aural detections that were NOT detected by the soundtrap in 2019
+## compare aural detections between years
+aural_2018 <- model_vars_df %>% group_by(site) %>% filter(year==2018,device=='aural') %>% dplyr::select(time,narwhal) %>% rename(narwhal_aural=narwhal)
 aural_2019 <- model_vars_df %>% group_by(site) %>% filter(year==2019,device=='aural') %>% dplyr::select(time,narwhal) %>% rename(narwhal_aural=narwhal)
+sum(aural_2018$narwhal_aural)
+sum(aural_2019$narwhal_aural)
+## see whether there are any aural detections that were NOT detected by the soundtrap in 2019
 sound_2019 <- model_vars_df %>% group_by(site) %>%  filter(year==2019,device=='soundtrap') %>% dplyr::select(time,narwhal)%>% rename(narwhal_sound=narwhal)
 
 compare <- aural_2019 %>% group_by(site) %>%  left_join(sound_2019,by="time") %>% filter(site.x==site.y, narwhal_aural==1 & narwhal_sound==0)
