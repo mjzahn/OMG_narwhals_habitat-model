@@ -41,7 +41,7 @@ Additional glacier variables:
 # files = list.files(data_dir='D:/Habitat_model_data/covariate_csv_files',pattern = '*.csv',recursive = TRUE)
 
 # data stored on external harddrive -- update path here
-data_dir <- 'H:/Habitat_model_data/covariate_csv_files/'
+data_dir <- 'F:/Habitat_model_data/covariate_csv_files/'
 
 ## load all data from csv files and add columns to indicate glacier/site and device (where applicable)
 ## then join all data into one dataframe per variable
@@ -193,7 +193,7 @@ glacier_vars_df <- read.csv(paste(data_dir,"narwhal_model_glacier_vars.csv",sep=
 # ALL narwhal detections (aural + soundtrap)
 model_vars_df <- runoff_racmo %>% 
   left_join(runoff_mar, by = c('time', 'site')) %>%
-  left_join(salt_shallow, by = c('time', 'site')) %>% 
+  left_join(salt_shallow, by = c('time', 'site')) %>%
   left_join(salt_deep, by = c('time', 'site')) %>%
   left_join(temp_shallow, by = c('time', 'site')) %>%
   left_join(temp_deep, by = c('time', 'site')) %>%
@@ -207,12 +207,12 @@ model_vars_df <- runoff_racmo %>%
 
 # pooled narwhal detections (i.e., any positive detection from Aural or ST = 1)
 narwhal_pooled_dets <- narwhal_pooled %>% dplyr::select(narwhal, site, device, time)
-model_vars_pooled_df <- runoff_racmo %>% 
+model_vars_df_pooled <- runoff_racmo %>% 
   left_join(runoff_mar, by = c('time', 'site')) %>%
-  left_join(salt_shallow, by = c('time', 'site')) %>% 
-  left_join(salt_deep, by = c('time', 'site')) %>%
-  left_join(temp_shallow, by = c('time', 'site')) %>%
-  left_join(temp_deep, by = c('time', 'site')) %>%
+  # left_join(salt_shallow, by = c('time', 'site')) %>%
+  # left_join(salt_deep, by = c('time', 'site')) %>%
+  # left_join(temp_shallow, by = c('time', 'site')) %>%
+  # left_join(temp_deep, by = c('time', 'site')) %>%
   left_join(sea_ice, by = c('time', 'site')) %>% 
   left_join(ice_vel, by = c('time', 'site')) %>% 
   left_join(glacier_len, by = c('time', 'site')) %>%
@@ -285,7 +285,7 @@ length(unique(obs_2018$time))+length(unique(obs_2018_jan$time)) # number of days
 length(unique(obs_2019$time))+length(unique(obs_2020$time)) # number of days (obs) sampled in 2019
 length(unique(mdl_data$time)) # number of days (obs) for open water period
 
-sum(model_vars_df_pooled$narwhal) # total of 96 detections over two years at 3 sites
+sum(model_vars_df_pooled$narwhal,na.rm = TRUE) # total of 96 detections over two years at 3 sites
 narwhal_dets_total <- model_vars_df_pooled %>% filter(narwhal==1) # number of days that narwhals were detected
 length(unique(narwhal_dets_total$time)) # number of unique days when narwhals were identified (78 including outliers)
 
